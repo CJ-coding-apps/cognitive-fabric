@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
 authors = [
-    { name = "James", email = "james@example.com" }
+    { name = "Jim Cuttler", email = "jimcuttler@gmail.com" }
 ]
 dependencies = [
     # Pinned exactly: kuzu is archived upstream (0.11.3 is the final release) and
