@@ -148,7 +148,9 @@ class TestEntityServiceFabric:
 @pytest.mark.integration
 class TestGraphProjectionIsolation:
     @pytest.mark.asyncio
-    async def test_projection_names_are_unique_per_call(self, kuzu_client: KuzuDBClient):
+    async def test_projection_names_are_unique_per_call(
+        self, kuzu_client: KuzuDBClient
+    ):
         """Two calls with the same requested name must not share a projection.
 
         ``project_graph`` / ``drop_projected_graph`` are database-global, so a

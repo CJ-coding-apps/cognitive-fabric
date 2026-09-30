@@ -91,4 +91,7 @@ class TestValidatePathContainment:
     ):
         """`src/../src` is refused on its literal parts, not silently resolved."""
         (tmp_path / "src").mkdir()
-        assert validate_path(str(tmp_path / "src" / ".." / "src"), root=str(tmp_path)) is False
+        assert (
+            validate_path(str(tmp_path / "src" / ".." / "src"), root=str(tmp_path))
+            is False
+        )

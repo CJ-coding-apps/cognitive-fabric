@@ -139,9 +139,8 @@ class MemoryAnalysisService:
                 affected_ids=[],  # Would need to fetch actual IDs
             ))
 
-        # Check for orphaned tags
-        tags = context.get("tags", {})
-        # Note: Would need orphaned tag data from context
+        # Orphaned-tag detection is not implemented: it needs orphaned tag data
+        # that the analysis context does not carry.
 
         return issues
 
