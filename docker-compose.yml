@@ -1,0 +1,118 @@
+version: '3.8'
+
+services:
+  # Development service with hot reloading
+  cognitive_fabric-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - .:/app
+      - cognitive_fabric-data:/app/data
+      - /app/.venv  # Exclude venv from volume mount
+    environment:
+      - COGNITIVE_FABRIC_DB_PATH=/app/data/cognitive_fabric.db
+      - COGNITIVE_FABRIC_LOG_LEVEL=DEBUG
+      - COGNITIVE_FABRIC_LOG_FORMAT=text
+    stdin_open: true
+    tty: true
+    command: python -m cognitive_fabric.main
+
+  # Test runner service
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - .:/app
+      - test-data:/app/data
+    environment:
+      - COGNITIVE_FABRIC_LOG_LEVEL=WARNING
+    command: pytest -v --tb=short
+
+  # Unit tests only
+  test-unit:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - .:/app
+      - test-data:/app/data
+    command: pytest tests/unit -v
+
+  # Integration tests only
+  test-integration:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - .:/app
+      - test-data:/app/data
+    command: pytest tests/integration -v -m integration
+
+  # E2E tests only
+  test-e2e:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - .:/app
+      - test-data:/app/data
+    command: pytest tests/e2e -v -m e2e
+
+  # Coverage report
+  coverage:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - .:/app
+      - test-data:/app/data
+    command: pytest --cov=cognitive_fabric --cov-report=html --cov-report=term
+
+  # Linting service
+  lint:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - .:/app
+    command: ruff check src/ tests/
+
+  # Type checking service
+  typecheck:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - .:/app
+    command: mypy src/
+
+  # Format check
+  format:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - .:/app
+    command: ruff format --check src/ tests/
+
+  # Production service
+  cognitive_fabric:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - cognitive_fabric-data:/app/data
+    environment:
+      - COGNITIVE_FABRIC_DB_PATH=/app/data/cognitive_fabric.db
+      - COGNITIVE_FABRIC_LOG_LEVEL=INFO
+      - COGNITIVE_FABRIC_LOG_FORMAT=json
+    stdin_open: true
+    tty: true
+
+volumes:
+  cognitive_fabric-data:
+    driver: local
+  test-data:
+    driver: local

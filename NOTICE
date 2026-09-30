@@ -1,0 +1,24 @@
+Cognitive-Fabric
+Copyright 2026 The Cognitive-Fabric Authors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+------------------------------------------------------------------------------
+Attribution
+------------------------------------------------------------------------------
+
+This project is the unified Python runtime of the Cognitive Fabric. It is
+seeded from and extends:
+
+  * KuzuMemPy-MCP — a Python port of KuzuMem-MCP (the MCP graph memory bank),
+    from which this repository's memory-bank core is derived.
+
+  * KuzuMem-MCP
+    https://github.com/Jakedismo/KuzuMem-MCP
+    Copyright the KuzuMem-MCP authors
+    Licensed under the Apache License, Version 2.0
+
+The "Cognitive Fabric" layer built on top of the memory-bank core comprises
+in-process (no network sidecar) tree-sitter symbolic (AST) ingestion, a
+LanceDB-backed semantic (vector) search layer, and a "dream"/evolution engine
+that distills episodic memory into the semantic graph.

@@ -1,0 +1,35 @@
+# Development Dockerfile for KuzuMemPy
+FROM python:3.11-slim
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Install uv for faster package management
+RUN pip install uv
+
+# Copy project files for dependency installation
+COPY pyproject.toml ./
+
+# Install all dependencies including dev
+RUN uv pip install --system -e ".[dev]"
+
+# Copy the rest of the code (will be overridden by volume mount in dev)
+COPY . .
+
+# Create data directory
+RUN mkdir -p /app/data
+
+# Default command for development
+CMD ["python", "-m", "cognitive_fabric.main"]

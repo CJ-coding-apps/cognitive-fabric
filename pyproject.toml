@@ -1,0 +1,91 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cognitive-fabric"
+version = "1.0.0"
+description = "Cognitive Fabric: unified Python MCP server for a KuzuDB graph memory bank with symbolic ingestion, semantic search, and distillation"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [
+    { name = "James", email = "james@example.com" }
+]
+dependencies = [
+    "kuzu>=0.10.0",
+    # Pinned < 2: mcp 2.x removed the low-level Server.list_tools/call_tool
+    # decorator API this server is built on.
+    "mcp>=1.9,<2",
+    "pydantic>=2.6.0",
+    "pydantic-settings>=2.0.0",
+    "structlog>=24.0.0",
+    "click>=8.1.0",
+    "openai>=1.0.0",
+    "anthropic>=0.20.0",
+    # Streamable-HTTP transport (opt-in via `serve --transport http`). These are
+    # already pulled in by mcp, but declared explicitly since the server imports
+    # them directly.
+    "starlette>=0.37",
+    "uvicorn>=0.30",
+    # Cognitive Fabric: in-process symbolic (AST) ingestion.
+    # tree-sitter-language-pack is the maintained, Python 3.13-compatible pack.
+    "tree-sitter-language-pack>=0.9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.3.0",
+    "mypy>=1.8.0",
+]
+# Vector store only (LanceDB). Enough for semantic search with OpenAI
+# embeddings (OPENAI_API_KEY) or an injected embedder.
+vectordb = [
+    "lancedb>=0.6.0",
+]
+# Recommended local semantic layer: LanceDB + fastembed (pure-ONNX embeddings,
+# no torch — works everywhere, including Python 3.13).
+semantic = [
+    "lancedb>=0.6.0",
+    "fastembed>=0.4.0",
+]
+# Optional heavier alternative: local embeddings via sentence-transformers
+# (requires torch, which has no wheel for some Python versions).
+semantic-st = [
+    "lancedb>=0.6.0",
+    "sentence-transformers>=2.6.0",
+]
+
+[project.scripts]
+cognitive-fabric = "cognitive_fabric.cli.main:cli"
+cognitive-fabric-server = "cognitive_fabric.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cognitive_fabric"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+# Fail on DeprecationWarnings originating from our own code (prevents e.g. the
+# datetime.utcnow() class of issue from silently returning). Third-party
+# deprecations remain warnings so dependency churn doesn't break CI.
+filterwarnings = [
+    "error::DeprecationWarning:cognitive_fabric",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_ignores = true
