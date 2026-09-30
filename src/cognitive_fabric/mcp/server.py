@@ -9,6 +9,7 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
 
+from cognitive_fabric import __app_name__, __version__
 from cognitive_fabric.config import Settings
 from cognitive_fabric.mcp.tool_context import ToolHandlerContext
 from cognitive_fabric.mcp.tool_registry import ToolRegistry
@@ -72,8 +73,11 @@ async def create_server(
     # Initialize context
     _context = ToolHandlerContext()
 
-    # Create server
-    server = Server("cognitive_fabric-mcp")
+    # Create server. `version` is passed explicitly: without it the MCP SDK
+    # falls back to the *mcp* package's version (`server_version = self.version
+    # if self.version else pkg_version("mcp")`), so a client checking the
+    # server's version on connect would be reading the SDK's version instead.
+    server = Server(__app_name__, version=__version__)
 
     @server.list_tools()
     async def list_tools() -> list[Tool]:

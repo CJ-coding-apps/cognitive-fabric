@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cognitive-fabric"
-version = "1.0.0"
+version = "0.1.0"
 description = "Cognitive Fabric: unified Python MCP server for a KuzuDB graph memory bank with symbolic ingestion, semantic search, and distillation"
 readme = "README.md"
 requires-python = ">=3.11"

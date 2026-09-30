@@ -1,4 +1,7 @@
 """Cognitive-Fabric: Python MCP server for graph memory bank using KuzuDB."""
 
-__version__ = "1.0.0"
+from cognitive_fabric._version import __version__
+
 __app_name__ = "cognitive_fabric-mcp"
+
+__all__ = ["__app_name__", "__version__"]

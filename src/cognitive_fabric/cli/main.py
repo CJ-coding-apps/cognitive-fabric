@@ -8,12 +8,13 @@ from typing import Optional
 
 import click
 
+from cognitive_fabric import __version__
 from cognitive_fabric.config import Settings
 from cognitive_fabric.utils.logger import configure_logging
 
 
 @click.group()
-@click.version_option(version="1.0.0", prog_name="cognitive_fabric")
+@click.version_option(version=__version__, prog_name="cognitive_fabric")
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
 @click.pass_context
 def cli(ctx: click.Context, verbose: bool) -> None:
