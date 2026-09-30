@@ -37,8 +37,7 @@ tree-sitter, embedding, and LLM work all run in-process.
 Requires Python 3.11+.
 
 ```bash
-# Clone this repository, then from its root:
-cd cognitive-fabric
+# Clone this repository, then from the repository root:
 python -m venv .venv && source .venv/bin/activate
 
 # Base install (memory bank + fabric ingestion via tree-sitter)
@@ -89,12 +88,19 @@ Register in your MCP client (e.g. Claude Code):
 {
   "mcpServers": {
     "cognitive-fabric": {
-      "command": "cognitive-fabric",
+      "command": "/absolute/path/to/cognitive-fabric/.venv/bin/cognitive-fabric",
       "args": ["serve", "--db-path", "/absolute/path/to/mem.db"]
     }
   }
 }
 ```
+
+Both paths must be absolute. An MCP client launches the server itself rather
+than through a shell, so it does not inherit the virtualenv you activated — a
+bare `"command": "cognitive-fabric"` fails with `No such file or directory`
+unless that directory happens to be on the client's `PATH`. `pip install -e .`
+puts the script at `.venv/bin/cognitive-fabric` inside the repository
+(`Scripts\cognitive-fabric.exe` on Windows).
 
 ## MCP tools
 
@@ -150,6 +156,11 @@ pytest -m integration  # integration only
 ruff check src tests
 mypy src
 ```
+
+`ruff check src tests` and `pytest` are the gates CI enforces. `mypy` is
+configured (`strict = true` in `pyproject.toml`) but the tree does not satisfy
+it yet, so it is not a gate — running it today reports errors. The
+configuration is in place; only the cleanup is outstanding.
 
 Tests that need the optional semantic stack (`[semantic]`) or a tree-sitter
 parser pack are skipped automatically when those are not installed.
