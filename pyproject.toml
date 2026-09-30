@@ -13,7 +13,10 @@ authors = [
     { name = "James", email = "james@example.com" }
 ]
 dependencies = [
-    "kuzu>=0.10.0",
+    # Pinned exactly: kuzu is archived upstream (0.11.3 is the final release) and
+    # its file format is not stable pre-1.0, so an unpinned upgrade can make an
+    # existing graph unreadable. Do not widen this without a migration step.
+    "kuzu==0.11.3",
     # Pinned < 2: mcp 2.x removed the low-level Server.list_tools/call_tool
     # decorator API this server is built on.
     "mcp>=1.9,<2",

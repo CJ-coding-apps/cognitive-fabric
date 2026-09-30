@@ -348,10 +348,6 @@ ANALYZE_TOOL = McpTool.create(
             "description": "The branch name",
             "default": "main",
         },
-        "projectedGraphName": {
-            "type": "string",
-            "description": "Name for the temporary projected graph",
-        },
         "nodeTableNames": {
             "type": "array",
             "items": {"type": "string"},
@@ -435,10 +431,6 @@ DETECT_TOOL = McpTool.create(
             "type": "string",
             "description": "The branch name",
             "default": "main",
-        },
-        "projectedGraphName": {
-            "type": "string",
-            "description": "Name for the temporary projected graph",
         },
         "nodeTableNames": {
             "type": "array",
@@ -543,11 +535,6 @@ BULK_IMPORT_TOOL = McpTool.create(
             "type": "array",
             "description": "TS wire: typed array of rules to import",
             "items": {"type": "object"},
-        },
-        "overwrite": {
-            "type": "boolean",
-            "description": "TS wire: overwrite existing entities on import",
-            "default": False,
         },
     },
     required=["repository"],
@@ -679,16 +666,6 @@ DELETE_TOOL = McpTool.create(
         "filterNamePattern": {
             "type": "string",
             "description": "TS wire: name substring filter for bulk-by-filter",
-        },
-        "confirm": {
-            "type": "boolean",
-            "description": "TS wire: confirm destructive bulk operation",
-            "default": False,
-        },
-        "force": {
-            "type": "boolean",
-            "description": "TS wire: force deletion regardless of guards",
-            "default": False,
         },
         "dryRun": {
             "type": "boolean",
@@ -860,7 +837,10 @@ FABRIC_TOOL = McpTool.create(
         },
         "path": {
             "type": "string",
-            "description": "Project directory to scan (ingest-ast)",
+            "description": (
+                "Project directory to scan (ingest-ast). Must be an existing "
+                "directory inside the session's clientProjectRoot."
+            ),
         },
         "itemId": {
             "type": "string",
@@ -906,6 +886,49 @@ MEMORY_BANK_MCP_TOOLS: List[McpTool] = [
     MEMORY_OPTIMIZER_TOOL,
     FABRIC_TOOL,
 ]
+
+# MCP annotations per tool, applied below. Kept as one table so the whole
+# classification is reviewable in a single place: an MCP client (and maf's
+# tool-classification layer) decides whether a call needs approval from these
+# two hints, so they must describe what the tool actually does.
+#
+# Rule used here (tool-level = worst case over the tool's operations):
+#   readOnlyHint=False  the tool performs any write.
+#   destructiveHint=True  the tool can delete existing data, or replace whole
+#                       existing structures/records (bulk upsert, ingest, or a
+#                       dropped graph projection) — i.e. not purely additive.
+#
+# Entries that are *not* read-named, despite sounding so:
+#   analyze / detect   CALL project_graph, and the projection is dropped again
+#                      (drop_projected_graph) — database-global state.
+#   bulk-import        writes through the entity upsert path (MERGE ... ON MATCH
+#                      SET), so a re-import overwrites existing entities.
+#   fabric             ingest-ast bulk-upserts File/Symbol nodes.
+TOOL_ANNOTATIONS: Dict[str, Dict[str, bool]] = {
+    # Performs no writes.
+    "query": {"readOnlyHint": True, "destructiveHint": False},
+    "introspect": {"readOnlyHint": True, "destructiveHint": False},
+    "search": {"readOnlyHint": True, "destructiveHint": False},
+    # Writes, additively: creates nodes/edges that are absent; memory-bank init
+    # is a no-op when the bank already exists.
+    "memory-bank": {"readOnlyHint": False, "destructiveHint": False},
+    "context": {"readOnlyHint": False, "destructiveHint": False},
+    "associate": {"readOnlyHint": False, "destructiveHint": False},
+    # Writes, not additively: may delete or replace existing data.
+    "entity": {"readOnlyHint": False, "destructiveHint": True},
+    "analyze": {"readOnlyHint": False, "destructiveHint": True},
+    "detect": {"readOnlyHint": False, "destructiveHint": True},
+    "bulk-import": {"readOnlyHint": False, "destructiveHint": True},
+    "delete": {"readOnlyHint": False, "destructiveHint": True},
+    "memory-optimizer": {"readOnlyHint": False, "destructiveHint": True},
+    "fabric": {"readOnlyHint": False, "destructiveHint": True},
+}
+
+for _tool in MEMORY_BANK_MCP_TOOLS:
+    # KeyError (not a silent default) if a tool is added without a
+    # classification: an unclassified tool must not reach a client.
+    _tool.annotations = TOOL_ANNOTATIONS[_tool.name]
+
 
 # Tool lookup by name
 _TOOLS_BY_NAME: Dict[str, McpTool] = {tool.name: tool for tool in MEMORY_BANK_MCP_TOOLS}

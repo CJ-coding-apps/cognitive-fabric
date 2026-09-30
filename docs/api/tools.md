@@ -665,7 +665,7 @@ Delete all entities of a type.
 | repository | string | Yes | Repository name |
 | branch | string | No | Branch name |
 | entityType | string | Yes | Entity type |
-| confirm | boolean | Yes | Must be `true` |
+| dryRun | boolean | No | If `true`, only report what would be deleted |
 
 #### bulk-by-tag
 
@@ -678,7 +678,7 @@ Delete all items with a specific tag.
 | repository | string | Yes | Repository name |
 | branch | string | No | Branch name |
 | tagId | string | Yes | Tag ID |
-| confirm | boolean | Yes | Must be `true` |
+| dryRun | boolean | No | If `true`, only report what would be deleted |
 
 ---
 

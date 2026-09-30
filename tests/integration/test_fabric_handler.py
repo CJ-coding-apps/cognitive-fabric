@@ -9,6 +9,7 @@ import pytest
 
 from cognitive_fabric.mcp.handlers.fabric import fabric_handler
 from cognitive_fabric.mcp.handlers.search import search_handler
+from cognitive_fabric.mcp.tool_context import ToolHandlerContext
 from cognitive_fabric.services.memory_service import MemoryService
 from cognitive_fabric.types.entities import (
     ComponentInput,
@@ -24,9 +25,9 @@ REPO = "h-repo"
 BRANCH = "main"
 
 
-async def _fab(op, memory_service, **kw):
+async def _fab(op, memory_service, context=None, **kw):
     params = {"operation": op, "repository": REPO, "branch": BRANCH, **kw}
-    return await fabric_handler(params, None, memory_service)
+    return await fabric_handler(params, context, memory_service)
 
 
 @pytest.mark.integration
@@ -111,9 +112,48 @@ class TestFabricHandler:
     async def test_ingest_ast(self, memory_service: MemoryService, tmp_path):
         pytest.importorskip("tree_sitter_language_pack")
         (tmp_path / "m.py").write_text("def hello():\n    return 1\n")
-        r = await _fab("ingest-ast", memory_service, path=str(tmp_path))
+        ctx = ToolHandlerContext(client_project_root=str(tmp_path))
+        r = await _fab("ingest-ast", memory_service, context=ctx, path=str(tmp_path))
         assert r["success"] is True
         assert r["data"]["symbols_upserted"] >= 1
+
+    @pytest.mark.asyncio
+    async def test_ingest_ast_refused_without_session_root(
+        self, memory_service: MemoryService, tmp_path
+    ):
+        """No clientProjectRoot -> nothing to confine against -> refuse.
+
+        Deliberately not gated on the tree-sitter extra: this is the confinement
+        check, and it must run wherever the suite runs.
+        """
+        (tmp_path / "m.py").write_text("def hello():\n    return 1\n")
+        r = await _fab("ingest-ast", memory_service, path=str(tmp_path))
+        assert r["success"] is False
+        assert "clientProjectRoot" in r["error"]
+
+    @pytest.mark.asyncio
+    async def test_ingest_ast_refused_outside_session_root(
+        self, memory_service: MemoryService, tmp_path
+    ):
+        root = tmp_path / "root"
+        root.mkdir()
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        (outside / "m.py").write_text("def hello():\n    return 1\n")
+        ctx = ToolHandlerContext(client_project_root=str(root))
+        r = await _fab("ingest-ast", memory_service, context=ctx, path=str(outside))
+        assert r["success"] is False
+        assert "clientProjectRoot" in r["error"]
+
+    @pytest.mark.asyncio
+    async def test_ingest_ast_refused_traversal(
+        self, memory_service: MemoryService, tmp_path
+    ):
+        root = tmp_path / "root"
+        root.mkdir()
+        ctx = ToolHandlerContext(client_project_root=str(root))
+        r = await _fab("ingest-ast", memory_service, context=ctx, path="../")
+        assert r["success"] is False
 
 
 @pytest.mark.integration

@@ -9,6 +9,7 @@ wheel, so ``page_rank`` / ``k_core_decomposition`` / ``louvain`` /
 
 from contextlib import contextmanager
 from typing import Iterator
+from uuid import uuid4
 
 from cognitive_fabric.db.kuzu_client import KuzuDBClient
 from cognitive_fabric.utils.security import (
@@ -70,7 +71,8 @@ def projected_graph(
 
     Args:
         client: The KuzuDB client.
-        name: Desired projection name (sanitized before use).
+        name: Prefix for the projection name (sanitized before use; a unique
+            suffix is appended — see below).
         node_tables: Node table names to project (validated against the label
             whitelist — ``project_graph`` cannot parameterize table names, so
             they are interpolated and must be trusted).
@@ -78,7 +80,7 @@ def projected_graph(
             relationship whitelist).
 
     Yields:
-        The sanitized projection name to pass to algorithm ``CALL``s.
+        The projection name to pass to algorithm ``CALL``s.
 
     Raises:
         ValueError: If any table name is not in the security whitelist.
@@ -98,12 +100,15 @@ def projected_graph(
         if label not in effective_nodes:
             effective_nodes.append(label)
 
-    safe = sanitize_projection_name(name) or "p_graph"
+    # The projection name is generated here, not supplied by the caller, and is
+    # unique per call. `project_graph` / `drop_projected_graph` are
+    # database-global, so a caller-chosen or shared name (e.g. a bare "cycles")
+    # lets one session drop a projection another session is still reading. The
+    # caller's `name` survives only as a sanitized, human-readable prefix.
+    safe = f"{sanitize_projection_name(name) or 'p_graph'}_{uuid4().hex[:12]}"
     nodes = "[" + ", ".join(f"'{t}'" for t in effective_nodes) + "]"
     rels = "[" + ", ".join(f"'{t}'" for t in rel_tables) + "]"
 
-    # Clear any stale projection left by a crashed call, then (re)create.
-    _drop_projection(client, safe)
     client.execute_query(f"CALL project_graph('{safe}', {nodes}, {rels})")
     try:
         yield safe

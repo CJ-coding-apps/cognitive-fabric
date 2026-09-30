@@ -9,6 +9,7 @@ import pytest_asyncio
 
 from cognitive_fabric.db.kuzu_client import KuzuDBClient
 from cognitive_fabric.repositories.file_repo import FileRepository
+from cognitive_fabric.repositories.graph_projection import projected_graph
 from cognitive_fabric.repositories.requirement_repo import RequirementRepository
 from cognitive_fabric.repositories.symbol_repo import SymbolRepository
 from cognitive_fabric.repositories.trace_repo import TraceRepository
@@ -142,3 +143,44 @@ class TestEntityServiceFabric:
             )
             is True
         )
+
+
+@pytest.mark.integration
+class TestGraphProjectionIsolation:
+    @pytest.mark.asyncio
+    async def test_projection_names_are_unique_per_call(self, kuzu_client: KuzuDBClient):
+        """Two calls with the same requested name must not share a projection.
+
+        ``project_graph`` / ``drop_projected_graph`` are database-global, so a
+        caller-supplied or fixed name lets one session drop a projection another
+        session is still reading.
+        """
+        with projected_graph(
+            kuzu_client, "cycles", ["Component"], ["DEPENDS_ON"]
+        ) as outer:
+            with projected_graph(
+                kuzu_client, "cycles", ["Component"], ["DEPENDS_ON"]
+            ) as inner:
+                assert inner != outer
+                names = {row["name"] for row in _live_projections(kuzu_client)}
+                assert {outer, inner} <= names
+
+            # The inner context dropped only its own projection. If the names
+            # had collided, `outer` would be gone here.
+            names = {row["name"] for row in _live_projections(kuzu_client)}
+            assert outer in names
+            assert inner not in names
+            # ... and the surviving projection is still usable.
+            assert (
+                kuzu_client.fetch_all(
+                    f"CALL weakly_connected_components('{outer}') "
+                    "RETURN node.id AS id LIMIT 1"
+                )
+                == []
+            )
+
+        assert _live_projections(kuzu_client) == []
+
+
+def _live_projections(client: KuzuDBClient) -> list[dict]:
+    return client.fetch_all("CALL show_projected_graphs() RETURN *")

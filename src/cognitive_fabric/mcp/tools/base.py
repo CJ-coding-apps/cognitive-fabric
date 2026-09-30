@@ -25,6 +25,14 @@ class McpTool(BaseModel):
         default_factory=dict,
         description="JSON Schema for the tool parameters",
     )
+    annotations: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description=(
+            "MCP tool annotations (readOnlyHint/destructiveHint). Consumed by "
+            "MCP clients to classify a tool before calling it, so they must "
+            "describe what the tool actually does."
+        ),
+    )
 
     @classmethod
     def create(
@@ -33,6 +41,7 @@ class McpTool(BaseModel):
         description: str,
         properties: Dict[str, Any],
         required: Optional[List[str]] = None,
+        annotations: Optional[Dict[str, Any]] = None,
     ) -> "McpTool":
         """Create an MCP tool with the given schema.
 
@@ -41,6 +50,7 @@ class McpTool(BaseModel):
             description: The tool description.
             properties: JSON Schema properties for parameters.
             required: List of required parameter names.
+            annotations: MCP annotations (e.g. ``readOnlyHint``).
 
         Returns:
             The created McpTool.
@@ -56,6 +66,7 @@ class McpTool(BaseModel):
             name=name,
             description=description,
             parameters=parameters,
+            annotations=annotations,
         )
 
     def to_mcp_format(self) -> Dict[str, Any]:
@@ -64,8 +75,11 @@ class McpTool(BaseModel):
         Returns:
             Dictionary in MCP tool format.
         """
-        return {
+        payload: Dict[str, Any] = {
             "name": self.name,
             "description": self.description,
             "inputSchema": self.parameters,
         }
+        if self.annotations is not None:
+            payload["annotations"] = self.annotations
+        return payload

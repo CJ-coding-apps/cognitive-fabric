@@ -37,7 +37,6 @@ async def analyze_handler(
     # Projection parameters (TS wire contract; optional here with defaults).
     node_tables = params.get("nodeTableNames")
     rel_tables = params.get("relationshipTableNames")
-    projection_name = params.get("projectedGraphName")
 
     logger.debug(
         "analyze handler",
@@ -50,11 +49,15 @@ async def analyze_handler(
 
     graph_analysis = await memory_service.graph_analysis
 
-    def _proj(default: str) -> Dict[str, Any]:
+    def _proj(label: str) -> Dict[str, Any]:
+        # `label` is only a prefix: the projection name itself is generated
+        # server-side (see graph_projection.projected_graph) so a caller cannot
+        # name — and therefore cannot collide with or drop — another session's
+        # projection.
         return {
             "node_tables": node_tables,
             "rel_tables": rel_tables,
-            "projected_graph_name": projection_name or default,
+            "projected_graph_name": label,
         }
 
     try:

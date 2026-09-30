@@ -10,6 +10,7 @@ from cognitive_fabric.mcp.tool_context import ToolHandlerContext
 from cognitive_fabric.services.memory_service import MemoryService
 from cognitive_fabric.types.entities import ContextInput
 from cognitive_fabric.utils.id_utils import format_graph_unique_id
+from cognitive_fabric.utils.path_utils import validate_path
 
 logger = structlog.get_logger(__name__)
 
@@ -34,6 +35,29 @@ async def fabric_handler(
             path = params.get("path")
             if not path:
                 return {"success": False, "error": "path is required for ingest-ast"}
+            # The scan path is confined to the session's clientProjectRoot (set
+            # by memory-bank init). Without it there is nothing to confine
+            # against, so refuse rather than scan an arbitrary directory.
+            client_project_root = (
+                context.client_project_root if context is not None else None
+            )
+            if not client_project_root:
+                return {
+                    "success": False,
+                    "error": (
+                        "ingest-ast requires an initialized memory bank: no "
+                        "clientProjectRoot in the session, so the scan path "
+                        "cannot be confined."
+                    ),
+                }
+            if not validate_path(path, must_exist=True, root=client_project_root):
+                return {
+                    "success": False,
+                    "error": (
+                        "path must be an existing directory inside the "
+                        "session's clientProjectRoot"
+                    ),
+                }
             data_fabric = await memory_service.data_fabric
             data = await data_fabric.ingest_project(path, repository, branch)
             return {

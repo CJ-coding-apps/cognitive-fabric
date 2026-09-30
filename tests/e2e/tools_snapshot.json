@@ -1,0 +1,1034 @@
+[
+  {
+    "name": "analyze",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "pagerank",
+            "k-core",
+            "louvain",
+            "shortest-path"
+          ],
+          "description": "The algorithm to run"
+        },
+        "algorithm": {
+          "type": "string",
+          "enum": [
+            "pagerank",
+            "k-core",
+            "louvain",
+            "shortest-path"
+          ],
+          "description": "Alias for 'type' (legacy)"
+        },
+        "repository": {
+          "type": "string",
+          "description": "The repository name"
+        },
+        "branch": {
+          "type": "string",
+          "description": "The branch name",
+          "default": "main"
+        },
+        "nodeTableNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Node tables to project (default: [Component])"
+        },
+        "relationshipTableNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Relationship tables to project (default: [DEPENDS_ON])"
+        },
+        "damping": {
+          "type": "number",
+          "description": "PageRank damping factor",
+          "default": 0.85
+        },
+        "maxIterations": {
+          "type": "integer",
+          "description": "PageRank maximum iterations",
+          "default": 20
+        },
+        "k": {
+          "type": "integer",
+          "description": "K value for k-core algorithm",
+          "default": 2
+        },
+        "startNodeId": {
+          "type": "string",
+          "description": "Start component ID for shortest-path"
+        },
+        "endNodeId": {
+          "type": "string",
+          "description": "End component ID for shortest-path"
+        },
+        "startId": {
+          "type": "string",
+          "description": "Alias for 'startNodeId' (legacy)"
+        },
+        "endId": {
+          "type": "string",
+          "description": "Alias for 'endNodeId' (legacy)"
+        }
+      },
+      "required": [
+        "repository"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "associate",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "associationType": {
+          "type": "string",
+          "enum": [
+            "file-component",
+            "tag-item",
+            "decision-component",
+            "rule-component",
+            "context-component"
+          ],
+          "description": "The type of association to create"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "file-component",
+            "tag-item",
+            "decision-component",
+            "rule-component",
+            "context-component"
+          ],
+          "description": "TS wire name for the association type (alias)"
+        },
+        "repository": {
+          "type": "string",
+          "description": "The repository name"
+        },
+        "branch": {
+          "type": "string",
+          "description": "The branch name",
+          "default": "main"
+        },
+        "sourceId": {
+          "type": "string",
+          "description": "The source entity ID"
+        },
+        "targetId": {
+          "type": "string",
+          "description": "The target entity ID"
+        },
+        "itemType": {
+          "type": "string",
+          "description": "Item type for tag-item association"
+        },
+        "fileId": {
+          "type": "string",
+          "description": "TS wire: file ID for file-component association"
+        },
+        "componentId": {
+          "type": "string",
+          "description": "TS wire: component ID for file-component association"
+        },
+        "itemId": {
+          "type": "string",
+          "description": "TS wire: item ID for tag-item association"
+        },
+        "tagId": {
+          "type": "string",
+          "description": "TS wire: tag ID for tag-item association"
+        },
+        "entityType": {
+          "type": "string",
+          "description": "TS wire: item label for tag-item association (Component/Decision/Rule/File/Context)"
+        }
+      },
+      "required": [
+        "repository"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "bulk-import",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "entityType": {
+          "type": "string",
+          "enum": [
+            "component",
+            "decision",
+            "rule"
+          ],
+          "description": "The type of entities to import"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "components",
+            "decisions",
+            "rules"
+          ],
+          "description": "TS wire name for the entity type (plural, alias of entityType)"
+        },
+        "repository": {
+          "type": "string",
+          "description": "The repository name"
+        },
+        "branch": {
+          "type": "string",
+          "description": "The branch name",
+          "default": "main"
+        },
+        "items": {
+          "type": "array",
+          "description": "Array of entities to import",
+          "items": {
+            "type": "object"
+          }
+        },
+        "components": {
+          "type": "array",
+          "description": "TS wire: typed array of components to import",
+          "items": {
+            "type": "object"
+          }
+        },
+        "decisions": {
+          "type": "array",
+          "description": "TS wire: typed array of decisions to import",
+          "items": {
+            "type": "object"
+          }
+        },
+        "rules": {
+          "type": "array",
+          "description": "TS wire: typed array of rules to import",
+          "items": {
+            "type": "object"
+          }
+        }
+      },
+      "required": [
+        "repository"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "context",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "enum": [
+            "update",
+            "get-recent",
+            "get-summary"
+          ],
+          "description": "The operation to perform"
+        },
+        "repository": {
+          "type": "string",
+          "description": "The repository name"
+        },
+        "branch": {
+          "type": "string",
+          "description": "The branch name",
+          "default": "main"
+        },
+        "data": {
+          "type": "object",
+          "description": "Context data for update operation",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "agent": {
+              "type": "string"
+            },
+            "summary": {
+              "type": "string"
+            },
+            "observation": {
+              "type": "string"
+            },
+            "key_findings": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "id": {
+          "type": "string",
+          "description": "TS wire (flat): context ID for update"
+        },
+        "name": {
+          "type": "string",
+          "description": "TS wire (flat): context name for update"
+        },
+        "agent": {
+          "type": "string",
+          "description": "TS wire (flat): agent for update"
+        },
+        "summary": {
+          "type": "string",
+          "description": "TS wire (flat): summary for update"
+        },
+        "observation": {
+          "type": "string",
+          "description": "TS wire (flat): observation for update"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Limit for get-recent operation",
+          "default": 10
+        }
+      },
+      "required": [
+        "operation",
+        "repository"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "delete",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "deleteType": {
+          "type": "string",
+          "enum": [
+            "single",
+            "bulk-by-type",
+            "bulk-by-tag",
+            "bulk-by-status",
+            "bulk-by-branch",
+            "bulk-by-repository",
+            "bulk-by-filter"
+          ],
+          "description": "The type of deletion"
+        },
+        "operation": {
+          "type": "string",
+          "enum": [
+            "single",
+            "bulk-by-type",
+            "bulk-by-tag",
+            "bulk-by-status",
+            "bulk-by-branch",
+            "bulk-by-repository",
+            "bulk-by-filter"
+          ],
+          "description": "TS wire name for the delete type (alias)"
+        },
+        "repository": {
+          "type": "string",
+          "description": "The repository name"
+        },
+        "branch": {
+          "type": "string",
+          "description": "The branch name",
+          "default": "main"
+        },
+        "entityType": {
+          "type": "string",
+          "description": "Entity type for single/bulk-by-type deletion"
+        },
+        "entityId": {
+          "type": "string",
+          "description": "Entity ID for single deletion"
+        },
+        "tagId": {
+          "type": "string",
+          "description": "Tag ID for bulk-by-tag deletion"
+        },
+        "status": {
+          "type": "string",
+          "description": "Status for bulk-by-status deletion"
+        },
+        "targetType": {
+          "type": "string",
+          "description": "TS wire: entity type for bulk-by-filter deletion"
+        },
+        "targetBranch": {
+          "type": "string",
+          "description": "TS wire: branch to delete for bulk-by-branch"
+        },
+        "filterStatus": {
+          "type": "string",
+          "description": "TS wire: status filter for bulk-by-filter"
+        },
+        "filterCreatedBefore": {
+          "type": "string",
+          "description": "TS wire: created-before ISO date filter"
+        },
+        "filterCreatedAfter": {
+          "type": "string",
+          "description": "TS wire: created-after ISO date filter"
+        },
+        "filterNamePattern": {
+          "type": "string",
+          "description": "TS wire: name substring filter for bulk-by-filter"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "description": "If true, only report what would be deleted",
+          "default": false
+        }
+      },
+      "required": [
+        "repository"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "detect",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "cycles",
+            "islands",
+            "path",
+            "strongly-connected",
+            "weakly-connected"
+          ],
+          "description": "The pattern to detect"
+        },
+        "pattern": {
+          "type": "string",
+          "enum": [
+            "cycles",
+            "islands",
+            "path",
+            "strongly-connected",
+            "weakly-connected"
+          ],
+          "description": "Alias for 'type' (legacy)"
+        },
+        "repository": {
+          "type": "string",
+          "description": "The repository name"
+        },
+        "branch": {
+          "type": "string",
+          "description": "The branch name",
+          "default": "main"
+        },
+        "nodeTableNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Node tables to project (default: [Component])"
+        },
+        "relationshipTableNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Relationship tables to project (default: [DEPENDS_ON])"
+        },
+        "startNodeId": {
+          "type": "string",
+          "description": "Start component ID for path"
+        },
+        "endNodeId": {
+          "type": "string",
+          "description": "End component ID for path"
+        }
+      },
+      "required": [
+        "repository"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "entity",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "enum": [
+            "create",
+            "update",
+            "get",
+            "delete"
+          ],
+          "description": "The operation to perform"
+        },
+        "entityType": {
+          "type": "string",
+          "enum": [
+            "component",
+            "decision",
+            "rule",
+            "file",
+            "tag"
+          ],
+          "description": "The type of entity"
+        },
+        "repository": {
+          "type": "string",
+          "description": "The repository name"
+        },
+        "branch": {
+          "type": "string",
+          "description": "The branch name",
+          "default": "main"
+        },
+        "id": {
+          "type": "string",
+          "description": "Entity ID (required for get/delete, optional for create/update)"
+        },
+        "data": {
+          "type": "object",
+          "description": "Entity data for create/update operations. Accepts TS wire field aliases: decisionStatus/ruleStatus->status, size_bytes->size, content_hash->checksum, plus optional language."
+        }
+      },
+      "required": [
+        "operation",
+        "entityType",
+        "repository"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "fabric",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "enum": [
+            "ingest-ast",
+            "dream",
+            "record-event",
+            "query-evolution",
+            "query-rationale",
+            "link-evolution",
+            "link-to-file",
+            "link-to-symbol"
+          ],
+          "description": "The fabric operation to perform"
+        },
+        "repository": {
+          "type": "string",
+          "description": "The repository name"
+        },
+        "branch": {
+          "type": "string",
+          "description": "The branch name",
+          "default": "main"
+        },
+        "path": {
+          "type": "string",
+          "description": "Project directory to scan (ingest-ast). Must be an existing directory inside the session's clientProjectRoot."
+        },
+        "itemId": {
+          "type": "string",
+          "description": "Entity id (query-evolution / query-rationale)"
+        },
+        "itemType": {
+          "type": "string",
+          "description": "Entity label: Symbol|Requirement|Decision"
+        },
+        "currentId": {
+          "type": "string",
+          "description": "Current id (link-evolution)"
+        },
+        "previousId": {
+          "type": "string",
+          "description": "Previous id (link-evolution)"
+        },
+        "symbolId": {
+          "type": "string",
+          "description": "Symbol id (link-to-file / link-to-symbol)"
+        },
+        "fileId": {
+          "type": "string",
+          "description": "File id (link-to-file)"
+        },
+        "traceId": {
+          "type": "string",
+          "description": "Trace id (link-to-symbol)"
+        },
+        "eventSummary": {
+          "type": "string",
+          "description": "Event summary (record-event)"
+        },
+        "eventObservation": {
+          "type": "string",
+          "description": "Event observation (record-event)"
+        }
+      },
+      "required": [
+        "operation",
+        "repository"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "introspect",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "enum": [
+            "labels",
+            "count",
+            "properties",
+            "indexes",
+            "statistics"
+          ],
+          "description": "The introspection operation"
+        },
+        "query": {
+          "type": "string",
+          "enum": [
+            "labels",
+            "count",
+            "properties",
+            "indexes",
+            "statistics"
+          ],
+          "description": "TS wire name for the introspection op (alias)"
+        },
+        "repository": {
+          "type": "string",
+          "description": "The repository name"
+        },
+        "branch": {
+          "type": "string",
+          "description": "The branch name",
+          "default": "main"
+        },
+        "label": {
+          "type": "string",
+          "description": "Node/relationship label for properties operation"
+        },
+        "target": {
+          "type": "string",
+          "description": "TS wire: node/relationship label (alias of label)"
+        }
+      },
+      "required": [
+        "repository"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "memory-bank",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "enum": [
+            "init",
+            "get-metadata",
+            "update-metadata"
+          ],
+          "description": "The operation to perform"
+        },
+        "repository": {
+          "type": "string",
+          "description": "The repository name"
+        },
+        "branch": {
+          "type": "string",
+          "description": "The branch name (default: main)",
+          "default": "main"
+        },
+        "clientProjectRoot": {
+          "type": "string",
+          "description": "The client's project root path (required for init)"
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Metadata to update (for update-metadata operation)"
+        }
+      },
+      "required": [
+        "operation",
+        "repository"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "memory-optimizer",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "enum": [
+            "analyze",
+            "optimize",
+            "rollback",
+            "list-snapshots",
+            "create-snapshot"
+          ],
+          "description": "The operation to perform"
+        },
+        "repository": {
+          "type": "string",
+          "description": "The repository name"
+        },
+        "branch": {
+          "type": "string",
+          "description": "The branch name",
+          "default": "main"
+        },
+        "strategy": {
+          "type": "string",
+          "enum": [
+            "conservative",
+            "balanced",
+            "aggressive"
+          ],
+          "description": "Optimization strategy",
+          "default": "balanced"
+        },
+        "llmProvider": {
+          "type": "string",
+          "enum": [
+            "openai",
+            "anthropic"
+          ],
+          "description": "TS wire: LLM provider for enhanced analysis (degrades gracefully without a live key)"
+        },
+        "model": {
+          "type": "string",
+          "description": "TS wire: LLM model name (e.g. o1-mini, claude)"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "description": "TS wire: preview optimization actions without applying them",
+          "default": true
+        },
+        "confirm": {
+          "type": "boolean",
+          "description": "TS wire: confirm a non-dry-run optimization (required when dryRun=false)",
+          "default": false
+        },
+        "maxDeletions": {
+          "type": "integer",
+          "description": "TS wire: cap the number of entity deletions performed"
+        },
+        "focusAreas": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "stale-detection",
+              "redundancy-removal",
+              "relationship-cleanup",
+              "dependency-optimization",
+              "tag-consolidation",
+              "orphan-removal"
+            ]
+          },
+          "description": "TS wire: restrict optimization to these categories (all if empty/absent)"
+        },
+        "preserveCategories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "TS wire: entity tag/category values to never delete"
+        },
+        "snapshotId": {
+          "type": "string",
+          "description": "Snapshot ID for rollback operation"
+        },
+        "analysisId": {
+          "type": "string",
+          "description": "TS wire: cached analysis ID from a prior analyze call to reuse during optimize"
+        },
+        "enableMCPSampling": {
+          "type": "boolean",
+          "description": "TS wire: attach a sampled memory context to analysis",
+          "default": true
+        },
+        "samplingStrategy": {
+          "type": "string",
+          "enum": [
+            "representative",
+            "problematic",
+            "recent",
+            "diverse"
+          ],
+          "description": "TS wire: memory sampling strategy",
+          "default": "representative"
+        },
+        "snapshotFailurePolicy": {
+          "type": "string",
+          "enum": [
+            "abort",
+            "continue",
+            "warn"
+          ],
+          "description": "TS wire: behavior when pre-optimization snapshot creation fails",
+          "default": "warn"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description for create-snapshot operation"
+        }
+      },
+      "required": [
+        "operation",
+        "repository"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "query",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "queryType": {
+          "type": "string",
+          "enum": [
+            "context",
+            "entities",
+            "relationships",
+            "dependencies",
+            "governance",
+            "history",
+            "tags"
+          ],
+          "description": "The type of query to perform"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "context",
+            "entities",
+            "relationships",
+            "dependencies",
+            "governance",
+            "history",
+            "tags"
+          ],
+          "description": "TS wire name for the query type (alias of queryType)"
+        },
+        "repository": {
+          "type": "string",
+          "description": "The repository name"
+        },
+        "branch": {
+          "type": "string",
+          "description": "The branch name",
+          "default": "main"
+        },
+        "entityType": {
+          "type": "string",
+          "description": "Entity type for entities query"
+        },
+        "relationshipType": {
+          "type": "string",
+          "description": "Relationship type for relationships query"
+        },
+        "componentId": {
+          "type": "string",
+          "description": "Component ID for dependencies/governance/history queries"
+        },
+        "tagId": {
+          "type": "string",
+          "description": "Tag ID for tags query"
+        },
+        "direction": {
+          "type": "string",
+          "enum": [
+            "in",
+            "out",
+            "both"
+          ],
+          "description": "Direction for dependency traversal",
+          "default": "both"
+        },
+        "depth": {
+          "type": "integer",
+          "description": "Depth for dependency traversal",
+          "default": 1
+        },
+        "filters": {
+          "type": "object",
+          "description": "Optional filters for entities query"
+        },
+        "startItemId": {
+          "type": "string",
+          "description": "TS wire: starting item ID for traversal queries"
+        },
+        "relationshipFilter": {
+          "type": "string",
+          "description": "TS wire: relationship type filter for traversals"
+        },
+        "targetNodeTypeFilter": {
+          "type": "string",
+          "description": "TS wire: target node type filter for traversals"
+        },
+        "latest": {
+          "type": "boolean",
+          "description": "TS wire: return only the latest results"
+        },
+        "label": {
+          "type": "string",
+          "description": "TS wire: node label / entity type for entities query"
+        },
+        "offset": {
+          "type": "integer",
+          "description": "TS wire: pagination offset"
+        },
+        "itemId": {
+          "type": "string",
+          "description": "TS wire: item ID for history query (alias of componentId)"
+        },
+        "itemType": {
+          "type": "string",
+          "description": "TS wire: item type for history query"
+        }
+      },
+      "required": [
+        "repository"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "search",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "searchType": {
+          "type": "string",
+          "enum": [
+            "fulltext",
+            "by-name",
+            "by-kind",
+            "semantic",
+            "hybrid"
+          ],
+          "description": "The type of search"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "fulltext",
+            "semantic",
+            "hybrid",
+            "by-name",
+            "by-kind"
+          ],
+          "description": "TS wire name for search mode (alias of searchType); semantic/hybrid use the Cognitive Fabric vector backend"
+        },
+        "repository": {
+          "type": "string",
+          "description": "The repository name"
+        },
+        "branch": {
+          "type": "string",
+          "description": "The branch name",
+          "default": "main"
+        },
+        "query": {
+          "type": "string",
+          "description": "The search query"
+        },
+        "entityTypes": {
+          "type": "array",
+          "description": "Entity types to search (optional, searches all if not specified)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum results to return",
+          "default": 20
+        },
+        "threshold": {
+          "type": "number",
+          "description": "Minimum similarity score for semantic/hybrid search",
+          "default": 0.0
+        }
+      },
+      "required": [
+        "repository"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  }
+]

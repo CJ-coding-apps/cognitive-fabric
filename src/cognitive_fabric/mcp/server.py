@@ -22,6 +22,22 @@ _tool_registry: Optional[ToolRegistry] = None
 _context: Optional[ToolHandlerContext] = None
 
 
+def build_mcp_tools(registry: ToolRegistry) -> list[Tool]:
+    """Build the MCP wire tool list from a registry.
+
+    Single source of truth for what the server advertises: both the
+    ``list_tools`` handler and the tool-surface snapshot test build through
+    this function, so the snapshot cannot drift from the wire.
+
+    Args:
+        registry: The tool registry to project.
+
+    Returns:
+        The MCP ``Tool`` objects, annotations included.
+    """
+    return [Tool(**tool.to_mcp_format()) for tool in registry.list_tools()]
+
+
 async def create_server(
     db_path: Optional[str] = None,
     settings: Optional[Settings] = None,
@@ -62,15 +78,8 @@ async def create_server(
     @server.list_tools()
     async def list_tools() -> list[Tool]:
         """List available tools."""
-        tools = _tool_registry.list_tools()
-        return [
-            Tool(
-                name=tool.name,
-                description=tool.description,
-                inputSchema=tool.parameters,
-            )
-            for tool in tools
-        ]
+        return build_mcp_tools(_tool_registry)
+
 
     @server.call_tool()
     async def call_tool(name: str, arguments: dict) -> list[TextContent]:

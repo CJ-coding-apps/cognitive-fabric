@@ -5,13 +5,14 @@ installed `mcp` package doesn't provide it. Tool workflows are driven through th
 real ToolRegistry -> handler -> service -> KuzuDB path.
 """
 
+import json
 from pathlib import Path
 
 import pytest
 import pytest_asyncio
 from mcp.server import Server
 
-from cognitive_fabric.mcp.server import create_server
+from cognitive_fabric.mcp.server import build_mcp_tools, create_server
 from cognitive_fabric.mcp.tool_context import ToolHandlerContext
 from cognitive_fabric.mcp.tool_registry import ToolRegistry
 from cognitive_fabric.services.memory_service import MemoryService
@@ -21,21 +22,41 @@ pytestmark = pytest.mark.skipif(
     reason="Installed mcp SDK lacks the 1.x low-level Server decorator API",
 )
 
-EXPECTED_TOOLS = [
-    "memory-bank",
-    "entity",
-    "context",
-    "query",
-    "associate",
-    "analyze",
-    "detect",
-    "introspect",
-    "bulk-import",
-    "search",
-    "delete",
-    "memory-optimizer",
-    "fabric",
-]
+# The frozen tool surface. Regenerate deliberately (and say so in the commit)
+# when the surface really changes — a rename or schema edit must not pass
+# silently, which is why this is an exact match and not a membership test.
+SNAPSHOT_PATH = Path(__file__).parent / "tools_snapshot.json"
+
+
+def _tool_surface(tool) -> dict:
+    """The frozen part of one tool: what a client sees and classifies on.
+
+    Descriptions are deliberately excluded — the published fingerprint is names,
+    schemas and annotations. Extend this deliberately, not by accident.
+    """
+    annotations = tool.annotations
+    return {
+        "name": tool.name,
+        "inputSchema": tool.inputSchema,
+        "annotations": (
+            None
+            if annotations is None
+            else {
+                "readOnlyHint": annotations.readOnlyHint,
+                "destructiveHint": annotations.destructiveHint,
+            }
+        ),
+    }
+
+
+def _live_surface() -> list:
+    """The tool surface exactly as the server advertises it."""
+    tools = build_mcp_tools(ToolRegistry())
+    return sorted((_tool_surface(t) for t in tools), key=lambda t: t["name"])
+
+
+def _saved_surface() -> list:
+    return json.loads(SNAPSHOT_PATH.read_text())
 
 
 @pytest.mark.e2e
@@ -50,10 +71,24 @@ class TestMCPServer:
 
     @pytest.mark.asyncio
     async def test_list_tools(self):
-        names = ToolRegistry().list_tool_names()
-        assert len(names) >= 13
-        for tool in EXPECTED_TOOLS:
-            assert tool in names, f"Tool {tool} not found"
+        live, saved = _live_surface(), _saved_surface()
+        assert [t["name"] for t in live] == [t["name"] for t in saved], (
+            "The set of advertised tools changed. If that is intended, "
+            f"re-freeze {SNAPSHOT_PATH.name}."
+        )
+        for live_tool, saved_tool in zip(live, saved):
+            assert live_tool == saved_tool, (
+                f"Tool surface changed for {live_tool['name']!r}. If that is "
+                f"intended, re-freeze {SNAPSHOT_PATH.name}."
+            )
+
+    @pytest.mark.asyncio
+    async def test_every_tool_is_annotated(self):
+        """An unclassified tool must not reach a client."""
+        for tool in build_mcp_tools(ToolRegistry()):
+            assert tool.annotations is not None, (
+                f"Tool {tool.name!r} has no annotations"
+            )
 
 
 @pytest.mark.e2e

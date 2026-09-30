@@ -37,7 +37,8 @@ tree-sitter, embedding, and LLM work all run in-process.
 Requires Python 3.11+.
 
 ```bash
-git clone <your-repo-url> cognitive-fabric && cd cognitive-fabric
+# Clone this repository, then from its root:
+cd cognitive-fabric
 python -m venv .venv && source .venv/bin/activate
 
 # Base install (memory bank + fabric ingestion via tree-sitter)
@@ -53,6 +54,14 @@ pip install -e '.[vectordb]'
 # Dev tools
 pip install -e '.[dev]'
 ```
+
+### KuzuDB version
+
+`kuzu` is pinned to `==0.11.3` in `pyproject.toml`. Kuzu is archived upstream —
+0.11.3 is the final release — and its on-disk format is not stable before 1.0, so a
+database written by one Kuzu version may not be readable by another. Treat the pin
+as a migration boundary, not a floor: to move versions, upgrade and then re-ingest
+(or export/import the graph) rather than pointing the new version at the old file.
 
 ## Quick start (CLI)
 
