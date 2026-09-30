@@ -26,6 +26,11 @@ htmlcov
 .tox
 .nox
 
+# Type-checker and linter caches (61 MB of .mypy_cache here)
+.mypy_cache
+.ruff_cache
+.cache
+
 # Build
 build
 dist
@@ -38,9 +43,17 @@ docs/_build
 # Local data
 data/
 *.db
+*.kuzu
+*.wal
+.kuzumem/
+.fabric_data/
 
 # Misc
 .DS_Store
 *.log
-.env.local
-.env.*.local
+
+# Secrets. .gitignore already covers `.env`, but this file did not — and
+# .dockerignore is what governs the build context, not .gitignore. An
+# untracked .env is exactly what a broad COPY would pick up.
+.env
+.env.*
