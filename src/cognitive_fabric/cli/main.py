@@ -87,7 +87,7 @@ def serve(
     # Build settings
     settings = Settings()
     if db_path:
-        settings.db_path_override = db_path
+        settings.db_path = db_path
 
     if ctx.obj.get("verbose"):
         click.echo(

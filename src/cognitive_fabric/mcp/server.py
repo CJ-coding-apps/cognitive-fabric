@@ -60,7 +60,7 @@ async def create_server(
 
     # Use provided db_path or default from settings
     if db_path is None:
-        db_path = settings.db_path_override
+        db_path = settings.db_path
 
     logger.info("Creating MCP server", db_path=db_path)
 

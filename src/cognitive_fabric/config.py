@@ -19,8 +19,17 @@ class Settings(BaseSettings):
     version: str = "1.0.0"
     db_name: str = "cognitive_fabric"
 
-    # Database
-    db_path_override: Optional[str] = None
+    # Database. The environment variable is COGNITIVE_FABRIC_DB_PATH: pydantic
+    # derives it from `env_prefix` plus this field name, and that is the name the
+    # CLI's --db-path, the Dockerfile, docker-compose.yml and
+    # docs/guides/configuration.md all use. The field was `db_path_override`,
+    # which reads COGNITIVE_FABRIC_DB_PATH_OVERRIDE -- a second name, used
+    # nowhere else. `python -m cognitive_fabric.main`, the entry point the
+    # container runs, reaches this field and nothing else, so the published
+    # image set a variable no reader looked at, started with db_path None, and
+    # exited on "db_path is required when creating MemoryService" before it
+    # could answer `initialize`. One setting, one name.
+    db_path: Optional[str] = None
 
     # Logging
     log_level: str = "INFO"

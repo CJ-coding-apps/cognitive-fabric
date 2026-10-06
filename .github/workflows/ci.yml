@@ -84,9 +84,10 @@ jobs:
         run: docker build --file Dockerfile --tag cognitive-fabric:ci .
 
       - name: Handshake over stdio
-        # Initialise, then let stdin close. The server names itself and its
-        # version before it needs a database or a credential, which is the point
-        # of checking here: no key, no network, no state.
+        # Initialise, then let stdin close. This does need the database path the
+        # Dockerfile sets: the server builds its MemoryService during startup and
+        # exits without one, so it cannot answer `initialize` pathless. No key
+        # and no network are needed, which is still the point of checking here.
         #
         # stdout carries the JSON-RPC stream, so anything the server logs has to
         # go to stderr. It does -- PrintLoggerFactory(file=sys.stderr) in
