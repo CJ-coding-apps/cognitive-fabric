@@ -758,10 +758,6 @@
           ],
           "description": "TS wire: LLM provider for enhanced analysis (degrades gracefully without a live key)"
         },
-        "model": {
-          "type": "string",
-          "description": "TS wire: LLM model name (e.g. o1-mini, claude)"
-        },
         "dryRun": {
           "type": "boolean",
           "description": "TS wire: preview optimization actions without applying them",

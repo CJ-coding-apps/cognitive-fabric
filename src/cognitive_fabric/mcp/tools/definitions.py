@@ -715,10 +715,6 @@ MEMORY_OPTIMIZER_TOOL = McpTool.create(
                 "gracefully without a live key)"
             ),
         },
-        "model": {
-            "type": "string",
-            "description": "TS wire: LLM model name (e.g. o1-mini, claude)",
-        },
         "dryRun": {
             "type": "boolean",
             "description": (

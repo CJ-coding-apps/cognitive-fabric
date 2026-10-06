@@ -112,6 +112,7 @@ class MemoryOptimizationAgent(BaseMemoryAgent):
         Returns:
             Analysis results.
         """
+        use_llm = use_llm and self._llm_client is not None
         logger.info(
             "Starting memory analysis",
             repository=repository,
@@ -119,11 +120,15 @@ class MemoryOptimizationAgent(BaseMemoryAgent):
             use_llm=use_llm,
         )
 
+        # The model is resolved only when an LLM is actually going to be used:
+        # an unconfigured model must not stop the rule-based analysis, and it
+        # must not be silently absent from the LLM one either.
         return await self._analysis_service.analyze(
             repository,
             branch,
-            use_llm=use_llm and self._llm_client is not None,
+            use_llm=use_llm,
             llm_client=self._llm_client,
+            model_name=self._resolve_model_name() if use_llm else None,
         )
 
     async def plan(
@@ -144,6 +149,7 @@ class MemoryOptimizationAgent(BaseMemoryAgent):
         Returns:
             The optimization plan.
         """
+        use_llm = use_llm and self._llm_client is not None
         logger.info(
             "Creating optimization plan",
             repository=repository,
@@ -156,8 +162,9 @@ class MemoryOptimizationAgent(BaseMemoryAgent):
             repository,
             branch,
             strategy,
-            use_llm=use_llm and self._llm_client is not None,
+            use_llm=use_llm,
             llm_client=self._llm_client,
+            model_name=self._resolve_model_name() if use_llm else None,
         )
 
     async def execute(

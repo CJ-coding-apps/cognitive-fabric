@@ -9,6 +9,7 @@ import json
 
 import pytest
 
+from cognitive_fabric import config as fabric_config
 from cognitive_fabric.services.memory_service import MemoryService
 from cognitive_fabric.types.entities import ContextInput, SymbolInput
 
@@ -44,18 +45,21 @@ class _FakeAnthropicClient:
 
     def __init__(self, payload: str):
         self._payload = payload
+        self.requests: list[dict] = []
 
     class _Messages:
-        def __init__(self, payload):
+        def __init__(self, payload, requests):
             self._payload = payload
+            self._requests = requests
 
         def create(self, **kwargs):
+            self._requests.append(kwargs)
             block = type("Block", (), {"text": self._payload})()
             return type("Resp", (), {"content": [block]})()
 
     @property
     def messages(self):
-        return self._Messages(self._payload)
+        return self._Messages(self._payload, self.requests)
 
 
 @pytest.mark.integration
@@ -175,8 +179,18 @@ class TestDreamService:
 
     @pytest.mark.asyncio
     async def test_distills_decisions_and_justifies(
-        self, memory_service: MemoryService
+        self, memory_service: MemoryService, monkeypatch
     ):
+        # A distillation call has to name a model, and this project ships no
+        # default to name -- so the test configures one the way an operator
+        # would, rather than relying on one compiled into the package. The
+        # provider is set to match the fake client below, so the model sent is
+        # the one configured for the provider being spoken to.
+        monkeypatch.setattr(fabric_config.settings, "llm_provider", "anthropic")
+        monkeypatch.setattr(
+            fabric_config.settings, "anthropic_model", "an-example-model"
+        )
+
         entity = await memory_service.entity
         await entity.create_symbol(REPO, SymbolInput(id="a.py:foo", name="foo"))
         ctx = await memory_service.context
@@ -207,6 +221,8 @@ class TestDreamService:
         assert result["status"] == "success"
         assert result["distilled_decisions"] == 1
         assert (await entity.get_decision(REPO, "dec-1", BRANCH)) is not None
+        # The configured model, not a model named anywhere in the package.
+        assert fake_llm.requests[0]["model"] == "an-example-model"
 
         kuzu = await memory_service.get_kuzu_client()
         rows = kuzu.fetch_all(

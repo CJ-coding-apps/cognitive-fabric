@@ -46,6 +46,7 @@ class MemoryAnalysisService:
         branch: str = "main",
         use_llm: bool = False,
         llm_client: Optional[Any] = None,
+        model_name: Optional[str] = None,
     ) -> AnalysisResult:
         """Analyze the memory bank.
 
@@ -54,6 +55,8 @@ class MemoryAnalysisService:
             branch: The branch name.
             use_llm: Whether to use LLM for enhanced analysis.
             llm_client: Optional LLM client for enhanced analysis.
+            model_name: The model to ask for. Comes from configuration, via the
+                agent; this service chooses no model of its own.
 
         Returns:
             Analysis results.
@@ -71,7 +74,7 @@ class MemoryAnalysisService:
         # Optionally enhance with LLM
         llm_analysis = None
         if use_llm and llm_client:
-            llm_analysis = await self._llm_analyze(context, llm_client)
+            llm_analysis = await self._llm_analyze(context, llm_client, model_name)
 
         return AnalysisResult(
             repository=repository,
@@ -238,12 +241,14 @@ class MemoryAnalysisService:
         self,
         context: Dict[str, Any],
         llm_client: Any,
+        model_name: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Perform LLM-enhanced analysis.
 
         Args:
             context: The analysis context.
             llm_client: The LLM client.
+            model_name: The model to ask for, from configuration.
 
         Returns:
             LLM analysis results.
@@ -256,19 +261,18 @@ class MemoryAnalysisService:
             if hasattr(llm_client, "chat"):
                 # OpenAI-style client
                 response = await llm_client.chat.completions.create(
-                    model="gpt-4o-mini",
+                    model=model_name,
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": prompt},
                     ],
-                    temperature=0.3,
                 )
                 response_text = response.choices[0].message.content
 
             elif hasattr(llm_client, "messages"):
                 # Anthropic-style client
                 response = await llm_client.messages.create(
-                    model="claude-3-haiku-20240307",
+                    model=model_name,
                     max_tokens=2000,
                     system=system_prompt,
                     messages=[{"role": "user", "content": prompt}],

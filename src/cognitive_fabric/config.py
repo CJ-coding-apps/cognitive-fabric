@@ -44,8 +44,15 @@ class Settings(BaseSettings):
     llm_provider: Literal["openai", "anthropic"] = "openai"
     openai_api_key: Optional[str] = None
     anthropic_api_key: Optional[str] = None
-    openai_model: str = "gpt-4o"
-    anthropic_model: str = "claude-sonnet-4-20250514"
+
+    # No default model. A model id compiled into the package is a decision
+    # nobody made: it picks a vendor, a price and a capability envelope at
+    # install time, and it fails only when the provider retires the name. These
+    # were `gpt-4o` and `claude-sonnet-4-20250514`. A provider is now usable only
+    # once a model is named for it, and `get_model_name` says which setting is
+    # missing when one is not.
+    openai_model: Optional[str] = None
+    anthropic_model: Optional[str] = None
 
     # Memory Optimizer
     optimizer_default_strategy: Literal["conservative", "balanced", "aggressive"] = (

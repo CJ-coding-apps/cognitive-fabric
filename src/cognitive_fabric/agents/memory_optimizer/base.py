@@ -5,6 +5,7 @@ from typing import Any, Dict, Optional
 
 import structlog
 
+from cognitive_fabric.llm import get_model_name
 from cognitive_fabric.services.memory_service import MemoryService
 from cognitive_fabric.types.optimization import OptimizationStrategy
 
@@ -17,7 +18,7 @@ class BaseMemoryAgent(ABC):
     def __init__(
         self,
         memory_service: MemoryService,
-        model_provider: str = "openai",
+        model_provider: Optional[str] = None,
         model_name: Optional[str] = None,
     ) -> None:
         """Initialize the base memory agent.
@@ -25,22 +26,32 @@ class BaseMemoryAgent(ABC):
         Args:
             memory_service: The memory service instance.
             model_provider: The AI model provider ('openai' or 'anthropic').
-            model_name: Optional specific model name to use.
+                Defaults to the configured `llm_provider`. Not defaulted here,
+                so that the provider chosen in configuration is the one used.
+            model_name: Optional specific model name to use. Defaults to the
+                configured model for the provider, resolved on use.
         """
         self._memory_service = memory_service
         self._model_provider = model_provider
-        self._model_name = model_name or self._get_default_model()
+        self._model_name = model_name
         self._logger = logger.bind(agent=self.__class__.__name__)
 
-    def _get_default_model(self) -> str:
-        """Get the default model name for the provider.
+    def _resolve_model_name(self) -> str:
+        """The configured model for this agent's provider.
 
-        Returns:
-            The default model name.
+        Resolved when an LLM is about to be used, not in `__init__`. Building an
+        agent is not using an LLM, and the optimizer's rule-based paths have to
+        keep working with no model configured -- raising at construction would
+        take the whole tool down to enforce a setting only the optional LLM path
+        needs. No model id appears here: the value comes from configuration, so
+        the model is the operator's choice and never this package's.
+
+        Raises:
+            LlmNotConfiguredError: if the provider has no model configured.
         """
-        if self._model_provider == "anthropic":
-            return "claude-3-haiku-20240307"
-        return "gpt-4o-mini"
+        if self._model_name:
+            return self._model_name
+        return get_model_name(provider=self._model_provider)
 
     @abstractmethod
     async def analyze(

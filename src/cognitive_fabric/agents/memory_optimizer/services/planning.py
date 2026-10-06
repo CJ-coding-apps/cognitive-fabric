@@ -50,6 +50,7 @@ class OptimizationPlanService:
         strategy: OptimizationStrategy = OptimizationStrategy.BALANCED,
         use_llm: bool = False,
         llm_client: Optional[Any] = None,
+        model_name: Optional[str] = None,
     ) -> OptimizationPlan:
         """Create an optimization plan.
 
@@ -59,6 +60,8 @@ class OptimizationPlanService:
             strategy: The optimization strategy.
             use_llm: Whether to use LLM for planning.
             llm_client: Optional LLM client.
+            model_name: The model to ask for. Comes from configuration, via the
+                agent; this service chooses no model of its own.
 
         Returns:
             The optimization plan.
@@ -80,7 +83,7 @@ class OptimizationPlanService:
 
         # Optionally enhance with LLM
         if use_llm and llm_client:
-            llm_plan = await self._create_llm_plan(context, llm_client)
+            llm_plan = await self._create_llm_plan(context, llm_client, model_name)
             if llm_plan and llm_plan.get("actions"):
                 # Merge LLM actions with rule-based actions
                 actions = self._merge_plans(actions, llm_plan.get("actions", []))
@@ -178,12 +181,14 @@ class OptimizationPlanService:
         self,
         context: Dict[str, Any],
         llm_client: Any,
+        model_name: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Create an LLM-enhanced optimization plan.
 
         Args:
             context: The optimization context.
             llm_client: The LLM client.
+            model_name: The model to ask for, from configuration.
 
         Returns:
             LLM plan dictionary.
@@ -195,18 +200,17 @@ class OptimizationPlanService:
             # Call LLM
             if hasattr(llm_client, "chat"):
                 response = await llm_client.chat.completions.create(
-                    model="gpt-4o-mini",
+                    model=model_name,
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": prompt},
                     ],
-                    temperature=0.3,
                 )
                 response_text = response.choices[0].message.content
 
             elif hasattr(llm_client, "messages"):
                 response = await llm_client.messages.create(
-                    model="claude-3-haiku-20240307",
+                    model=model_name,
                     max_tokens=2000,
                     system=system_prompt,
                     messages=[{"role": "user", "content": prompt}],
