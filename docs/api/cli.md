@@ -7,7 +7,7 @@ Cognitive-Fabric provides a command-line interface for server management and dat
 The CLI is automatically installed with the package:
 
 ```bash
-pip install cognitive_fabric-mcp
+pip install cognitive-fabric
 ```
 
 Two commands are available:

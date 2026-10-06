@@ -12,8 +12,8 @@ This guide will help you get Cognitive-Fabric up and running quickly.
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-repo/cognitive_fabric-mcp.git
-cd cognitive_fabric-mcp
+git clone https://github.com/your-repo/cognitive-fabric.git
+cd cognitive-fabric
 ```
 
 ### 2. Build the Container
@@ -74,7 +74,7 @@ Add Cognitive-Fabric to your Claude Code MCP settings:
       "command": "docker",
       "args": [
         "compose",
-        "-f", "/path/to/cognitive_fabric-mcp/docker-compose.yml",
+        "-f", "/path/to/cognitive-fabric/docker-compose.yml",
         "run", "--rm", "-T", "cognitive_fabric"
       ]
     }

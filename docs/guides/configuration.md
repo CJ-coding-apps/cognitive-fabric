@@ -149,7 +149,7 @@ Add to your Claude Code MCP settings:
       "command": "docker",
       "args": [
         "compose",
-        "-f", "/path/to/cognitive_fabric-mcp/docker-compose.yml",
+        "-f", "/path/to/cognitive-fabric/docker-compose.yml",
         "run", "--rm", "-T", "cognitive_fabric"
       ],
       "env": {
@@ -299,8 +299,9 @@ query_timeout = 30
 ### Memory Settings
 
 ```bash
-# Limit memory usage in Docker
-docker run -m 512m cognitive_fabric-mcp
+# Build the same image CI builds, then cap its memory
+docker build --file Dockerfile --tag cognitive-fabric:ci .
+docker run -m 512m cognitive-fabric:ci
 ```
 
 ## Troubleshooting Configuration

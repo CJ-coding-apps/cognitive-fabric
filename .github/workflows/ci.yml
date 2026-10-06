@@ -112,7 +112,7 @@ jobs:
           # back to the *mcp package's* version, which is how the handshake once
           # advertised 1.30.0 for a 0.1.0 server.
           EXPECTED_VERSION = "0.1.0"
-          EXPECTED_NAME = "cognitive_fabric-mcp"
+          EXPECTED_NAME = "cognitive-fabric"
 
           raw = pathlib.Path("/tmp/handshake.jsonl").read_text()
 

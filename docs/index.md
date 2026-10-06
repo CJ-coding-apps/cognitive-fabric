@@ -52,8 +52,8 @@ Cognitive-Fabric enables AI assistants to maintain persistent, structured memory
 
 | Resource | Description |
 |----------|-------------|
-| [GitHub Repository](https://github.com/your-repo/cognitive_fabric-mcp) | Source code |
-| [Issue Tracker](https://github.com/your-repo/cognitive_fabric-mcp/issues) | Report bugs |
+| [GitHub Repository](https://github.com/your-repo/cognitive-fabric) | Source code |
+| [Issue Tracker](https://github.com/your-repo/cognitive-fabric/issues) | Report bugs |
 | [MCP Specification](https://modelcontextprotocol.io/) | Protocol documentation |
 | [KuzuDB Documentation](https://kuzudb.com/docs/) | Database documentation |
 
@@ -69,7 +69,7 @@ Cognitive-Fabric enables AI assistants to maintain persistent, structured memory
 If you encounter issues:
 
 1. Check the [Troubleshooting Guide](guides/troubleshooting.md)
-2. Search existing [GitHub Issues](https://github.com/your-repo/cognitive_fabric-mcp/issues)
+2. Search existing [GitHub Issues](https://github.com/your-repo/cognitive-fabric/issues)
 3. Open a new issue with reproduction steps
 
 ## License

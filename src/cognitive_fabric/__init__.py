@@ -2,6 +2,6 @@
 
 from cognitive_fabric._version import __version__
 
-__app_name__ = "cognitive_fabric-mcp"
+__app_name__ = "cognitive-fabric"
 
 __all__ = ["__app_name__", "__version__"]
