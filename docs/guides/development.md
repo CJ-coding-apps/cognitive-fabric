@@ -14,7 +14,7 @@ This guide covers development setup, coding standards, and contribution guidelin
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-repo/cognitive-fabric.git
+git clone https://github.com/CJ-coding-apps/cognitive-fabric.git
 cd cognitive-fabric
 
 # Build the development container

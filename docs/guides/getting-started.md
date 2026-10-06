@@ -12,7 +12,7 @@ This guide will help you get Cognitive-Fabric up and running quickly.
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-repo/cognitive-fabric.git
+git clone https://github.com/CJ-coding-apps/cognitive-fabric.git
 cd cognitive-fabric
 ```
 
