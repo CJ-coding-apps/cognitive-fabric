@@ -16,12 +16,19 @@ Cognitive-Fabric is configured primarily through environment variables. You can 
 
 ### LLM Settings (for Memory Optimizer)
 
+There is no default model. A model id picks a vendor, a price and a capability
+envelope, none of which this package should choose on your behalf, so a provider
+becomes usable only once you name a model for it. Without one the call fails and
+names the setting to set, rather than guessing; a name the provider no longer
+lists fails the same way, listing what it does offer.
+
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `COGNITIVE_FABRIC_LLM_PROVIDER` | `openai` | LLM provider (`openai` or `anthropic`) |
-| `OPENAI_API_KEY` | - | OpenAI API key |
-| `ANTHROPIC_API_KEY` | - | Anthropic API key |
-| `COGNITIVE_FABRIC_LLM_MODEL` | `gpt-4o-mini` | Model to use for optimization |
+| `COGNITIVE_FABRIC_LLM_PROVIDER` | `openai` | Which provider the memory optimizer calls (`openai` or `anthropic`) |
+| `COGNITIVE_FABRIC_OPENAI_MODEL` | *(none)* | OpenAI model id — pick a current one from <https://platform.openai.com/docs/models>. Required when the provider is `openai`. |
+| `COGNITIVE_FABRIC_ANTHROPIC_MODEL` | *(none)* | Anthropic model id — pick a current one from <https://docs.anthropic.com/en/docs/about-claude/models>. Required when the provider is `anthropic`. |
+| `OPENAI_API_KEY` | - | OpenAI API key (also readable as `COGNITIVE_FABRIC_OPENAI_API_KEY`) |
+| `ANTHROPIC_API_KEY` | - | Anthropic API key (also readable as `COGNITIVE_FABRIC_ANTHROPIC_API_KEY`) |
 
 ### Example .env File
 
@@ -33,13 +40,17 @@ COGNITIVE_FABRIC_DB_PATH=/app/data/memory.db
 COGNITIVE_FABRIC_LOG_LEVEL=INFO
 COGNITIVE_FABRIC_LOG_FORMAT=json
 
-# LLM (optional, for memory optimizer)
+# LLM (optional -- only the memory optimizer calls a provider). There is no
+# default model, so name one; without it the call stops and says so. The model
+# id below is a placeholder, not a recommendation.
 COGNITIVE_FABRIC_LLM_PROVIDER=openai
 OPENAI_API_KEY=sk-your-api-key-here
+COGNITIVE_FABRIC_OPENAI_MODEL=<model id from https://platform.openai.com/docs/models>
 
 # Alternative: Anthropic
 # COGNITIVE_FABRIC_LLM_PROVIDER=anthropic
 # ANTHROPIC_API_KEY=sk-ant-your-api-key-here
+# COGNITIVE_FABRIC_ANTHROPIC_MODEL=<model id from https://docs.anthropic.com/en/docs/about-claude/models>
 ```
 
 ## Configuration File
@@ -57,7 +68,8 @@ format = "json"
 
 [llm]
 provider = "openai"
-model = "gpt-4o-mini"
+# Required, with no default; the id here is a placeholder, not a recommendation.
+model = "<model id from https://platform.openai.com/docs/models>"
 
 [optimizer]
 default_strategy = "balanced"
