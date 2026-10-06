@@ -27,8 +27,18 @@ jobs:
       - name: Install dependencies
         run: pip install -e '.[dev]'
 
+      # The smoke script is named individually rather than linting `scripts/`
+      # wholesale, because scripts/start_server.py does not pass: it inserts a
+      # path before importing and so trips E402, and it imports
+      # `kuzumempy.main`, which does not exist -- the file cannot run at all.
+      # Widening this to `scripts` would mean gating a tree that is already red
+      # on a defect that is not this job's to fix. Either repair or remove that
+      # file, then this becomes `scripts`.
+      #
+      # It is in the gate because the smoke script is the one thing here CI
+      # cannot check at test time, and code no gate reads is code that rots.
       - name: Run Ruff linter
-        run: ruff check src tests
+        run: ruff check src tests scripts/live_provider_smoke.py
 
       # mypy is deliberately not a gate here yet. It is configured
       # (`strict = true` in pyproject.toml) but the tree does not satisfy it:
