@@ -64,9 +64,14 @@ def test_vector_store_upsert_replaces_repo_branch(tmp_path):
 def test_vector_store_real_fastembed_embeddings(tmp_path, monkeypatch):
     """Full local semantic path: real fastembed (ONNX) embeddings + real LanceDB."""
     pytest.importorskip("fastembed")
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    # A key in the environment must not pick the backend; configuration does.
+    # Setting one here is what makes that a test rather than an assumption --
+    # this used to be delenv, because a key was enough to move the store to a
+    # cloud provider nobody asked for.
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-not-a-real-key")
 
-    vs = VectorStore(data_dir=str(tmp_path))  # no injected embedder -> fastembed
+    # No injected embedder, so the configured provider is what gets built.
+    vs = VectorStore(data_dir=str(tmp_path))
     assert vs.backend == "fastembed"
 
     vs.upsert("repo", "main", SYMBOLS)  # login, logout
