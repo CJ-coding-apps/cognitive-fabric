@@ -158,7 +158,8 @@ Settings load from environment (prefix `COGNITIVE_FABRIC_`) or a `.env` file
   error.
 - `COGNITIVE_FABRIC_FABRIC_DATA_DIR` — where the LanceDB vector store lives.
 - `COGNITIVE_FABRIC_FABRIC_EMBEDDING_PROVIDER` (`sentence-transformers` |
-  `openai`).
+  `openai`). The `sentence-transformers` backend needs the `[semantic-st]` extra;
+  it is the one embedding backend no CI job installs, so it has no test behind it.
 
 ## Development
 
