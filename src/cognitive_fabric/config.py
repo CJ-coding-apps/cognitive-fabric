@@ -2,6 +2,7 @@
 
 from typing import Literal, Optional
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -58,6 +59,15 @@ class Settings(BaseSettings):
     optimizer_default_strategy: Literal["conservative", "balanced", "aggressive"] = (
         "conservative"
     )
+    # A deployment-level ceiling on how many entities one optimization run may
+    # delete, under any strategy and whatever the caller asks for. Unset means
+    # the strategy's own limit applies. It is enforced where the deletions
+    # happen, not where the plan is drawn up, so a caller cannot route around it.
+    #
+    # The published docs described this setting for a release in which nothing
+    # read it. A safety limit that silently does nothing is worse than none: the
+    # operator believes a cap exists and behaves accordingly.
+    optimizer_max_deletions: Optional[int] = Field(default=None, ge=0)
     optimizer_enable_mcp_sampling: bool = True
     optimizer_snapshot_failure_policy: Literal["abort", "continue", "warn"] = "warn"
     optimizer_default_sampling_strategy: Literal[

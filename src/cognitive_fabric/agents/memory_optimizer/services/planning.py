@@ -7,8 +7,10 @@ import structlog
 
 from cognitive_fabric.agents.memory_optimizer.context_builder import (
     MemoryContextBuilder,
+    effective_max_deletions,
 )
 from cognitive_fabric.agents.memory_optimizer.prompt_manager import PromptManager
+from cognitive_fabric.config import settings as default_settings
 from cognitive_fabric.services.memory_service import MemoryService
 from cognitive_fabric.types.optimization import (
     AgentOptimizationAction as OptimizationAction,
@@ -89,9 +91,7 @@ class OptimizationPlanService:
                 actions = self._merge_plans(actions, llm_plan.get("actions", []))
 
         # Apply strategy limits
-        actions = self._apply_strategy_limits(
-            actions, context.get("strategy_config", {})
-        )
+        actions = self._apply_strategy_limits(actions, strategy)
 
         plan_id = str(uuid.uuid4())
 
@@ -263,25 +263,37 @@ class OptimizationPlanService:
     def _apply_strategy_limits(
         self,
         actions: List[OptimizationAction],
-        strategy_config: Dict[str, Any],
+        strategy: str,
     ) -> List[OptimizationAction]:
-        """Apply strategy limits to actions.
+        """Apply the deletion limit to a plan's actions.
+
+        The limit caps deletions, and only deletions. It used to truncate the
+        whole action list, so a plan of 30 low-risk status updates and 3
+        deletions came out as 10 updates and no deletions under `conservative`
+        -- a deletion limit that removed work it was not about, and reported a
+        plan smaller than the memory actually needed.
 
         Args:
             actions: The list of actions.
-            strategy_config: The strategy configuration.
+            strategy: The strategy name, which selects the preset limit.
 
         Returns:
-            Limited list of actions.
+            The actions, with the lowest-risk deletions beyond the limit dropped.
         """
-        max_deletions = strategy_config.get("max_deletions", 50)
+        max_deletions = effective_max_deletions(
+            strategy, operator_cap=default_settings.optimizer_max_deletions
+        )
 
         # Sort by risk level (low first)
         risk_order = {"low": 0, "medium": 1, "high": 2}
-        sorted_actions = sorted(
-            actions,
-            key=lambda a: risk_order.get(a.risk_level, 2),
-        )
+        ordered = sorted(actions, key=lambda a: risk_order.get(a.risk_level, 2))
 
-        # Apply limit
-        return sorted_actions[:max_deletions]
+        kept: List[OptimizationAction] = []
+        deletions_kept = 0
+        for action in ordered:
+            if action.action_type == "delete":
+                if deletions_kept >= max_deletions:
+                    continue
+                deletions_kept += 1
+            kept.append(action)
+        return kept

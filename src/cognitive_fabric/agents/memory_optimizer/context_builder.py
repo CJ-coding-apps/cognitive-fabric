@@ -1,12 +1,83 @@
 """Memory context builder for optimization agents."""
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import structlog
 
 from cognitive_fabric.services.memory_service import MemoryService
 
 logger = structlog.get_logger(__name__)
+
+# The strategy presets, at module scope because they are not one caller's
+# business: the planner reads them to clamp a plan, the tool handler reads them
+# to clamp a request, and docs/guides/configuration.md's table is checked
+# against them by tests/unit/test_strategy_docs.py. Inside the method below,
+# each of those would have had to keep its own copy of the numbers -- which is
+# how the published table came to say "balanced: 20 deletions" while the code
+# said 50.
+STRATEGY_CONFIGS: Dict[str, Dict[str, Any]] = {
+    "conservative": {
+        "delete_deprecated": True,
+        "require_no_dependents": True,
+        "delete_orphaned_tags": False,
+        "max_deletions": 10,
+        "stale_days_threshold": 90,
+    },
+    "balanced": {
+        "delete_deprecated": True,
+        "require_no_dependents": False,
+        "delete_orphaned_tags": True,
+        "max_deletions": 50,
+        "stale_days_threshold": 60,
+    },
+    "aggressive": {
+        "delete_deprecated": True,
+        "require_no_dependents": False,
+        "delete_orphaned_tags": True,
+        "max_deletions": 100,
+        "stale_days_threshold": 30,
+    },
+}
+
+# What an unrecognised strategy name falls back to. Not "aggressive": this
+# package deletes memory, so an unreadable or hallucinated strategy must not be
+# the one that removes the most.
+DEFAULT_STRATEGY = "balanced"
+
+
+def effective_max_deletions(
+    strategy: str,
+    requested: Optional[int] = None,
+    operator_cap: Optional[int] = None,
+) -> int:
+    """Return the number of deletions one run may perform.
+
+    Three ceilings can apply and the lowest wins, because each is a ceiling its
+    own author intended to be absolute:
+
+      * the strategy's own ``max_deletions`` -- always present;
+      * ``operator_cap``, from ``COGNITIVE_FABRIC_OPTIMIZER_MAX_DELETIONS`` --
+        set by whoever deployed the server, and not something a caller can
+        raise;
+      * ``requested`` -- what the caller asked for, which can only lower the
+        result.
+
+    Letting ``requested`` win would mean the model-facing ``maxDeletions``
+    argument could lift the operator's cap; letting ``operator_cap`` win alone
+    would let a high cap override a conservative strategy. Neither is a cap.
+
+    Args:
+        strategy: The strategy name; unknown names use the default preset.
+        requested: The caller's requested limit, if any.
+        operator_cap: The operator's configured limit, if any.
+
+    Returns:
+        The lowest applicable limit.
+    """
+    config = STRATEGY_CONFIGS.get(strategy, STRATEGY_CONFIGS[DEFAULT_STRATEGY])
+    ceilings = [config["max_deletions"]]
+    ceilings.extend(c for c in (operator_cap, requested) if c is not None)
+    return min(int(c) for c in ceilings)
 
 
 class MemoryContextBuilder:
@@ -179,30 +250,7 @@ class MemoryContextBuilder:
         Returns:
             Strategy configuration.
         """
-        configs = {
-            "conservative": {
-                "delete_deprecated": True,
-                "require_no_dependents": True,
-                "delete_orphaned_tags": False,
-                "max_deletions": 10,
-                "stale_days_threshold": 90,
-            },
-            "balanced": {
-                "delete_deprecated": True,
-                "require_no_dependents": False,
-                "delete_orphaned_tags": True,
-                "max_deletions": 50,
-                "stale_days_threshold": 60,
-            },
-            "aggressive": {
-                "delete_deprecated": True,
-                "require_no_dependents": False,
-                "delete_orphaned_tags": True,
-                "max_deletions": 100,
-                "stale_days_threshold": 30,
-            },
-        }
-        return configs.get(strategy, configs["balanced"])
+        return STRATEGY_CONFIGS.get(strategy, STRATEGY_CONFIGS[DEFAULT_STRATEGY])
 
     async def get_component_details(
         self,

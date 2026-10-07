@@ -4,6 +4,9 @@ from typing import Any, Dict, List, Optional
 
 import structlog
 
+from cognitive_fabric.agents.memory_optimizer.context_builder import (
+    effective_max_deletions,
+)
 from cognitive_fabric.agents.memory_optimizer.mcp_sampling import MemorySamplingManager
 from cognitive_fabric.config import settings
 from cognitive_fabric.mcp.tool_context import ToolHandlerContext
@@ -220,7 +223,14 @@ async def _handle_optimize(
     strategy = params.get("strategy", settings.optimizer_default_strategy)
     dry_run = params.get("dryRun", True)
     confirm = params.get("confirm", False)
-    max_deletions = params.get("maxDeletions")
+    # Resolved here and enforced where the deletes are issued, so neither the
+    # caller's `maxDeletions` nor a high strategy can lift the operator's cap,
+    # and an absent `maxDeletions` no longer means "unbounded".
+    max_deletions = effective_max_deletions(
+        strategy,
+        requested=params.get("maxDeletions"),
+        operator_cap=settings.optimizer_max_deletions,
+    )
     focus_areas = params.get("focusAreas") or []
     preserve_categories = params.get("preserveCategories") or []
     analysis_id = params.get("analysisId")
@@ -413,7 +423,7 @@ async def _optimize_memory_bank(
     branch: str,
     strategy: str,
     dry_run: bool = False,
-    max_deletions: Optional[int] = None,
+    max_deletions: int = 0,
     focus_areas: Optional[List[str]] = None,
     preserve_categories: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
@@ -425,7 +435,10 @@ async def _optimize_memory_bank(
         branch: The branch name.
         strategy: Optimization strategy (conservative, balanced, aggressive).
         dry_run: If True, report would-be actions without deleting.
-        max_deletions: Optional cap on the number of deletions.
+        max_deletions: The number of deletions this run may perform. Required
+            rather than optional: an omitted cap used to mean "unbounded", and
+            the caller resolves it from the strategy and the operator's
+            COGNITIVE_FABRIC_OPTIMIZER_MAX_DELETIONS before it gets here.
         focus_areas: Only perform categories tied to these focus areas.
             Empty/None means all categories are eligible.
         preserve_categories: Skip deleting entities whose category/tag matches.
@@ -447,14 +460,12 @@ async def _optimize_memory_bank(
     errors: List[Dict[str, Any]] = []
     skipped: List[Dict[str, Any]] = []
 
-    def _remaining_budget() -> Optional[int]:
-        if max_deletions is None:
-            return None
-        return max_deletions - (len(actions_taken) + len(would_delete))
-
     def _budget_exhausted() -> bool:
-        rem = _remaining_budget()
-        return rem is not None and rem <= 0
+        # A real run counts what it deleted; a dry run counts what it would.
+        # Both are held to the same cap, so a dry run cannot promise more
+        # deletions than the real run would be allowed to perform -- which is
+        # the whole point of asking for one.
+        return len(actions_taken) + len(would_delete) >= max_deletions
 
     async def _delete_component(component: Any, reason: str) -> None:
         entry = {
