@@ -53,9 +53,10 @@ jobs:
       # fails.
       fail-fast: false
       matrix:
-        # 3.13 is claimed in the README ("works everywhere, incl. Python 3.13")
-        # and in pyproject's comments, but was never tested.
-        python-version: ['3.11', '3.13']
+        # Every version the package installs on, and nothing beyond them. 3.14 is
+        # excluded by `requires-python`, because kuzu 0.11.3 ships no cp314 wheels
+        # for macOS or Windows; the comment there has the detail.
+        python-version: ['3.11', '3.12', '3.13']
         # Two installs, because the failure worth catching here is not a red
         # test -- it is a green run in which the optional half never ran. The
         # vector-store suite is `pytest.importorskip("lancedb")` at module level,

@@ -7,7 +7,17 @@ name = "cognitive-fabric"
 version = "0.1.0"
 description = "Cognitive Fabric: unified Python MCP server for a KuzuDB graph memory bank with symbolic ingestion, semantic search, and distillation"
 readme = "README.md"
-requires-python = ">=3.11"
+# The ceiling is Kùzu's, not ours. `kuzu==0.11.3` (pinned below) publishes cp314
+# wheels for Linux only -- its macOS and Windows wheels stop at cp313. On 3.14
+# those two platforms get no wheel, so pip falls back to the 19 MB sdist and
+# tries to compile Kùzu's C++ from source; that usually fails with an error
+# naming neither this package nor the reason. Declaring the ceiling turns it
+# into one clear line from pip, before anything is downloaded.
+#
+# Lifting it means Kùzu (or the Kùzu pin) is resolved first. It is recorded with
+# the other Kùzu consequences in the project's open decisions; do not widen this
+# line on its own.
+requires-python = ">=3.11,<3.14"
 license = "Apache-2.0"
 authors = [
     { name = "Jim Cuttler", email = "jimcuttler@gmail.com" }
@@ -82,13 +92,20 @@ vectordb = [
     "lancedb>=0.6.0,<0.26",
 ]
 # Recommended local semantic layer: LanceDB + fastembed (pure-ONNX embeddings,
-# no torch — works everywhere, including Python 3.13).
+# no torch — works on every Python this package supports).
 semantic = [
     "lancedb>=0.6.0,<0.26",
     "fastembed>=0.4.0",
 ]
 # Optional heavier alternative: local embeddings via sentence-transformers
 # (requires torch, which has no wheel for some Python versions).
+#
+# NOT covered by CI: no job installs this extra, so it is the one embedding
+# backend with no test behind it. It is kept rather than dropped because
+# `sentence-transformers` is a documented value of
+# COGNITIVE_FABRIC_FABRIC_EMBEDDING_PROVIDER, and removing the extra would leave
+# that setting with no supported install route. Treat any defect found in this
+# path as a defect in untested code.
 semantic-st = [
     "lancedb>=0.6.0,<0.26",
     "sentence-transformers>=2.6.0",
