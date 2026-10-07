@@ -57,10 +57,12 @@ jobs:
         with:
           python-version: '3.11'
 
-      # No extras: the openai and anthropic SDKs are core dependencies of this
-      # package, so every provider it can speak to is present.
+      # `.[cloud]`: the two provider SDKs live in an extra, not in the core
+      # dependencies, so a local-first install does not download them. This job
+      # is the one that speaks to a provider for real, so it is the one that has
+      # to ask for them.
       - name: Install dependencies
-        run: pip install -e .
+        run: pip install -e '.[cloud]'
 
       - name: One tiny call per provider
         env:

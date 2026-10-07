@@ -212,7 +212,10 @@ def get_llm_client(settings: Optional[Settings] = None) -> Any:
         try:
             from anthropic import Anthropic
         except Exception as e:  # pragma: no cover - SDK availability guard
-            raise LlmNotConfiguredError(f"anthropic SDK unavailable: {e}") from e
+            raise LlmNotConfiguredError(
+                f"the anthropic SDK is not installed ({e}). It is in the "
+                "'cloud' extra: pip install 'cognitive-fabric[cloud]'"
+            ) from e
         kwargs = (
             {"api_key": settings.anthropic_api_key}
             if settings.anthropic_api_key
@@ -228,6 +231,9 @@ def get_llm_client(settings: Optional[Settings] = None) -> Any:
     try:
         from openai import OpenAI
     except Exception as e:  # pragma: no cover - SDK availability guard
-        raise LlmNotConfiguredError(f"openai SDK unavailable: {e}") from e
+        raise LlmNotConfiguredError(
+            f"the openai SDK is not installed ({e}). It is in the 'cloud' "
+            "extra: pip install 'cognitive-fabric[cloud]'"
+        ) from e
     kwargs = {"api_key": settings.openai_api_key} if settings.openai_api_key else {}
     return OpenAI(**kwargs)

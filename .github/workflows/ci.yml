@@ -65,8 +65,14 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      # `.[cloud]` as well as dev. No test today imports either SDK -- the LLM
+      # tests use duck-typed fakes and the smoke script that does need them is
+      # deliberately not in this gate -- so this is not covering a hidden skip.
+      # It is here so the extra is *installed* on every run: an extra that does
+      # not resolve is a broken install for every user who asks for it, and
+      # nothing else in CI would notice.
       - name: Install dependencies
-        run: pip install -e '.[dev]'
+        run: pip install -e '.[dev,cloud]'
 
       # Tests needing the optional [semantic] stack (LanceDB) skip themselves
       # when it is absent, which is the documented behaviour — they are not

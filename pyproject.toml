@@ -24,8 +24,6 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "structlog>=24.0.0",
     "click>=8.1.0",
-    "openai>=1.0.0",
-    "anthropic>=0.20.0",
     # Streamable-HTTP transport (opt-in via `serve --transport http`). These are
     # already pulled in by mcp, but declared explicitly since the server imports
     # them directly.
@@ -44,8 +42,25 @@ dev = [
     "ruff>=0.3.0",
     "mypy>=1.8.0",
 ]
-# Vector store only (LanceDB). Enough for semantic search with OpenAI
-# embeddings (OPENAI_API_KEY) or an injected embedder.
+# Talking to a hosted LLM: the memory optimizer's Dream engine, and the OpenAI
+# embedding backend. Optional because this package is local-first -- a purely
+# local install (KuzuDB + tree-sitter + local embeddings) should not download two
+# vendor SDKs it will never call. Absent, each path fails with the setting or the
+# extra to install rather than an ImportError, since both imports are guarded.
+#
+# Each is capped below the next major. These are the two dependencies whose
+# major releases change the request shapes this package builds against: an SDK
+# major has removed a parameter the other repo's providers were still passing,
+# and the break surfaced as a runtime TypeError on a user's machine rather than
+# at install. A cap turns that into a Dependabot PR proposing the lift, which is
+# a thing a person reviews. Do not lift without re-running the live-provider
+# smoke workflow against the proposed version.
+cloud = [
+    "openai>=1.0.0,<4",
+    "anthropic>=0.20.0,<2",
+]
+# Vector store only (LanceDB). Enough for semantic search with an injected
+# embedder; the OpenAI embedding backend additionally needs the `cloud` extra.
 vectordb = [
     "lancedb>=0.6.0",
 ]

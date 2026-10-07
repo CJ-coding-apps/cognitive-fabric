@@ -26,8 +26,11 @@ COPY pyproject.toml ./
 COPY README.md ./
 COPY src/ ./src/
 
-# Install dependencies using uv
-RUN uv pip install --system -e .
+# Install dependencies using uv. `[cloud]` because the image serves the
+# `memory-optimizer` tool, which needs a provider SDK whenever an operator has
+# configured a key; the SDKs moved out of the core dependencies, so an install
+# that wants them has to ask. No `[semantic]`: this image never had it.
+RUN uv pip install --system -e '.[cloud]'
 
 # Create data directory
 RUN mkdir -p /app/data && chown -R cognitive_fabric:cognitive_fabric /app

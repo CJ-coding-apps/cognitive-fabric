@@ -47,8 +47,14 @@ pip install -e .
 # works everywhere, incl. Python 3.13)
 pip install -e '.[semantic]'
 
-# Or just the vector store (LanceDB) to use OpenAI embeddings (OPENAI_API_KEY)
+# Or just the vector store (LanceDB), for an injected embedder
 pip install -e '.[vectordb]'
+
+# Talking to a hosted provider: the OpenAI and Anthropic SDKs. Needed by the
+# dream engine / memory optimizer, and by the OpenAI embedding backend. Not
+# installed by default — a local-first install should not download two vendor
+# SDKs it never calls.
+pip install -e '.[cloud]'
 
 # Dev tools
 pip install -e '.[dev]'
@@ -142,7 +148,9 @@ Settings load from environment (prefix `COGNITIVE_FABRIC_`) or a `.env` file
 (see `.env.example`). Key vars:
 
 - `COGNITIVE_FABRIC_LLM_PROVIDER` (`openai` | `anthropic`) + `OPENAI_API_KEY` /
-  `ANTHROPIC_API_KEY` — enables the dream engine.
+  `ANTHROPIC_API_KEY` — enables the dream engine. Both the provider SDKs come
+  from the `[cloud]` extra (`pip install -e '.[cloud]'`); without it the dream
+  engine reports that the SDK is missing rather than raising an import error.
 - `COGNITIVE_FABRIC_FABRIC_DATA_DIR` — where the LanceDB vector store lives.
 - `COGNITIVE_FABRIC_FABRIC_EMBEDDING_PROVIDER` (`sentence-transformers` |
   `openai`).

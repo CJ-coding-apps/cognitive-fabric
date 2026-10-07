@@ -107,7 +107,9 @@ class VectorStore:
                 from openai import OpenAI
             except Exception as e:
                 raise ValueError(
-                    f"the openai embedding backend is not installed: {e}"
+                    f"the openai embedding backend is not installed: {e}. The "
+                    "SDK is in the 'cloud' extra: pip install "
+                    "'cognitive-fabric[cloud]'"
                 ) from e
             self._openai = OpenAI()
             self._embed_model = model

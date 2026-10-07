@@ -53,6 +53,11 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 ```
 
+Add `cloud` if you intend to use a hosted provider —
+`pip install -e ".[dev,cloud]"` — which brings in the OpenAI and Anthropic SDKs
+for the dream engine / memory optimizer. Without it, those paths report the
+missing SDK instead of failing on import.
+
 ### 3. Run the Server
 
 ```bash
