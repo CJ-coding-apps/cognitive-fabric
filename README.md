@@ -210,7 +210,8 @@ MCP client (stdio)
 
 Everything runs in one Python process over stdio; the fabric ML runs in-process
 (no sidecar, no network data plane). See
-[docs/architecture.md](docs/architecture.md) and [docs/fabric.md](docs/fabric.md).
+[docs/architecture.md](https://github.com/CJ-coding-apps/cognitive-fabric/blob/main/docs/architecture.md)
+and [docs/fabric.md](https://github.com/CJ-coding-apps/cognitive-fabric/blob/main/docs/fabric.md).
 
 ## Project structure
 
