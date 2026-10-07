@@ -37,28 +37,29 @@ tree-sitter, embedding, and LLM work all run in-process.
 Requires Python 3.11+.
 
 ```bash
-# Clone this repository, then from the repository root:
-python -m venv .venv && source .venv/bin/activate
-
 # Base install (memory bank + fabric ingestion via tree-sitter)
-pip install -e .
+pip install cognitive-fabric
 
 # Semantic search: LanceDB + fastembed local embeddings (pure ONNX, no torch —
 # works everywhere, incl. Python 3.13)
-pip install -e '.[semantic]'
+pip install 'cognitive-fabric[semantic]'
 
 # Or just the vector store (LanceDB), for an injected embedder
-pip install -e '.[vectordb]'
+pip install 'cognitive-fabric[vectordb]'
 
 # Talking to a hosted provider: the OpenAI and Anthropic SDKs. Needed by the
 # dream engine / memory optimizer, and by the OpenAI embedding backend. Not
 # installed by default — a local-first install should not download two vendor
 # SDKs it never calls.
-pip install -e '.[cloud]'
+pip install 'cognitive-fabric[cloud]'
 
 # Dev tools
-pip install -e '.[dev]'
+pip install 'cognitive-fabric[dev]'
 ```
+
+To work from a checkout instead, clone this repository, create a virtualenv, and
+use `.` in place of the package name: `pip install -e .`,
+`pip install -e '.[semantic]'`, and so on.
 
 ### KuzuDB version
 
@@ -149,8 +150,9 @@ Settings load from environment (prefix `COGNITIVE_FABRIC_`) or a `.env` file
 
 - `COGNITIVE_FABRIC_LLM_PROVIDER` (`openai` | `anthropic`) + `OPENAI_API_KEY` /
   `ANTHROPIC_API_KEY` — enables the dream engine. Both the provider SDKs come
-  from the `[cloud]` extra (`pip install -e '.[cloud]'`); without it the dream
-  engine reports that the SDK is missing rather than raising an import error.
+  from the `[cloud]` extra (`pip install 'cognitive-fabric[cloud]'`); without it
+  the dream engine reports that the SDK is missing rather than raising an import
+  error.
 - `COGNITIVE_FABRIC_FABRIC_DATA_DIR` — where the LanceDB vector store lives.
 - `COGNITIVE_FABRIC_FABRIC_EMBEDDING_PROVIDER` (`sentence-transformers` |
   `openai`).
