@@ -36,13 +36,13 @@ def cli(ctx: click.Context, verbose: bool) -> None:
     "--log-level",
     "-l",
     type=click.Choice(["DEBUG", "INFO", "WARNING", "ERROR"]),
-    default="INFO",
-    help="Logging level",
+    default=None,
+    help="Logging level. Unset means COGNITIVE_FABRIC_LOG_LEVEL.",
 )
 @click.option(
-    "--json-logs",
-    is_flag=True,
-    help="Output logs in JSON format",
+    "--json-logs/--no-json-logs",
+    default=None,
+    help="JSON or plain-text logs. Unset means COGNITIVE_FABRIC_LOG_JSON.",
 )
 @click.option(
     "--transport",
@@ -66,8 +66,8 @@ def cli(ctx: click.Context, verbose: bool) -> None:
 def serve(
     ctx: click.Context,
     db_path: Optional[str],
-    log_level: str,
-    json_logs: bool,
+    log_level: Optional[str],
+    json_logs: Optional[bool],
     transport: str,
     host: Optional[str],
     port: Optional[int],
@@ -80,14 +80,21 @@ def serve(
     """
     from cognitive_fabric.mcp.server import run_http_server, run_server
 
-    # Reconfigure logging if needed
-    if json_logs or log_level != "INFO":
-        configure_logging(log_level=log_level, json_output=json_logs)
-
     # Build settings
     settings = Settings()
     if db_path:
         settings.db_path = db_path
+
+    # A flag wins over the environment, and the environment over this command's
+    # own default. Both options used to carry a value of their own -- "INFO" and
+    # an `is_flag` default of False -- so neither could tell "not given" from
+    # "given the default", and `COGNITIVE_FABRIC_LOG_LEVEL` and
+    # `COGNITIVE_FABRIC_LOG_JSON`, which the configuration guide documents, did
+    # not reach the server.
+    configure_logging(
+        log_level=log_level or settings.log_level,
+        json_output=settings.log_json if json_logs is None else json_logs,
+    )
 
     if ctx.obj.get("verbose"):
         click.echo(

@@ -211,7 +211,9 @@ class TestTheDefaultStrategyHasOneHome:
             self._strategy_run_passes_to_optimize(strategy="louvain-typo")
 
     def test_the_plan_prompt_names_a_missing_strategy_instead_of_inventing_one(self):
-        from cognitive_fabric.agents.memory_optimizer.prompt_manager import PromptManager
+        from cognitive_fabric.agents.memory_optimizer.prompt_manager import (
+            PromptManager,
+        )
 
         with pytest.raises(KeyError):
             PromptManager().build_optimization_prompt({})

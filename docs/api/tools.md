@@ -18,6 +18,7 @@ Cognitive-Fabric provides 13 MCP tools for memory management. This document desc
 | [search](#search) | Full-text search |
 | [delete](#delete) | Safe deletion operations |
 | [memory-optimizer](#memory-optimizer) | AI-powered memory optimization |
+| [fabric](#fabric) | Code-evolution memory: AST ingestion, rationale and trace links |
 
 ---
 
@@ -98,7 +99,7 @@ Create a new entity.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | operation | string | Yes | `"create"` |
-| type | string | Yes | Entity type (see below) |
+| entityType | string | Yes | Entity type (see below) |
 | repository | string | Yes | Repository name |
 | branch | string | No | Branch name |
 | data | object | Yes | Entity data |
@@ -107,15 +108,17 @@ Create a new entity.
 - `component` - Software components
 - `decision` - Architectural decisions
 - `rule` - Governance rules
-- `context` - Session context
 - `file` - File references
 - `tag` - Tags for categorization
+
+Session context entries are not an `entity` type; they have their own tool
+(`context`), and `entity` refuses the name.
 
 **Example - Create Component:**
 ```json
 {
   "operation": "create",
-  "type": "component",
+  "entityType": "component",
   "repository": "my-app",
   "branch": "main",
   "data": {
@@ -132,7 +135,7 @@ Create a new entity.
 ```json
 {
   "operation": "create",
-  "type": "decision",
+  "entityType": "decision",
   "repository": "my-app",
   "data": {
     "id": "adr-001",
@@ -152,7 +155,7 @@ Retrieve an entity by ID.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | operation | string | Yes | `"get"` |
-| type | string | Yes | Entity type |
+| entityType | string | Yes | Entity type |
 | repository | string | Yes | Repository name |
 | branch | string | No | Branch name |
 | id | string | Yes | Entity ID |
@@ -165,7 +168,7 @@ Update an existing entity.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | operation | string | Yes | `"update"` |
-| type | string | Yes | Entity type |
+| entityType | string | Yes | Entity type |
 | repository | string | Yes | Repository name |
 | branch | string | No | Branch name |
 | id | string | Yes | Entity ID |
@@ -179,7 +182,7 @@ Delete an entity.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | operation | string | Yes | `"delete"` |
-| type | string | Yes | Entity type |
+| entityType | string | Yes | Entity type |
 | repository | string | Yes | Repository name |
 | branch | string | No | Branch name |
 | id | string | Yes | Entity ID |
@@ -205,7 +208,10 @@ Add or update a context entry.
 | agent | string | Yes | Agent identifier |
 | summary | string | Yes | Context summary |
 | observation | string | No | Additional observations |
-| relatedComponents | array | No | Component IDs to link |
+
+There is no `relatedComponents`. A context entry is linked to a component by
+`associate`'s `context-component` association, which is a separate call and a
+separate relationship; a key passed here would be ignored.
 
 **Example:**
 ```json
@@ -214,8 +220,7 @@ Add or update a context entry.
   "repository": "my-app",
   "agent": "claude",
   "summary": "Discussed authentication implementation",
-  "observation": "User prefers JWT over sessions",
-  "relatedComponents": ["auth-service"]
+  "observation": "User prefers JWT over sessions"
 }
 ```
 
@@ -224,6 +229,11 @@ Add or update a context entry.
 ## query
 
 Structured queries against the memory graph.
+
+The operation is named by `type`; `queryType` is accepted as an alias. Each row
+below is the property that operation reads — a parameter an operation does not
+list is ignored, and the call answers with an error about the property it
+wanted.
 
 ### Operations
 
@@ -234,21 +244,19 @@ Query entities by type with optional filters.
 **Parameters:**
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| operation | string | Yes | `"entities"` |
+| type | string | Yes | `"entities"` |
 | repository | string | Yes | Repository name |
 | branch | string | No | Branch name |
-| entityType | string | Yes | Entity type to query |
-| status | string | No | Filter by status |
-| limit | integer | No | Max results (default: 100) |
+| entityType | string | Yes | Entity type to query (the alias `label` is also accepted) |
+| filters | object | No | `{"status": "active"}` is the only filter the service applies; other keys are ignored |
 
 **Example:**
 ```json
 {
-  "operation": "entities",
+  "type": "entities",
   "repository": "my-app",
   "entityType": "component",
-  "status": "active",
-  "limit": 50
+  "filters": {"status": "active"}
 }
 ```
 
@@ -259,26 +267,27 @@ Get dependency graph for a component.
 **Parameters:**
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| operation | string | Yes | `"dependencies"` |
+| type | string | Yes | `"dependencies"` |
 | repository | string | Yes | Repository name |
 | branch | string | No | Branch name |
 | componentId | string | Yes | Component ID |
-| direction | string | No | `"upstream"`, `"downstream"`, or `"both"` |
-| depth | integer | No | Traversal depth (default: 3) |
+| direction | string | No | `"in"`, `"out"`, or `"both"` (default: `"both"`) |
+| depth | integer | No | Traversal depth (default: 1) |
 
 #### relationships
 
-Query relationships between entities.
+Query relationships of one type across the repository.
 
 **Parameters:**
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| operation | string | Yes | `"relationships"` |
+| type | string | Yes | `"relationships"` |
 | repository | string | Yes | Repository name |
 | branch | string | No | Branch name |
-| fromId | string | No | Source entity ID |
-| toId | string | No | Target entity ID |
-| type | string | No | Relationship type |
+| relationshipType | string | Yes | Relationship type, e.g. `"DEPENDS_ON"` |
+
+This is not a two-endpoint lookup: it returns every relationship of that type in
+the repository. To walk from one component, use `dependencies`.
 
 #### governance
 
@@ -287,7 +296,7 @@ Query governance rules and decisions for a component.
 **Parameters:**
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| operation | string | Yes | `"governance"` |
+| type | string | Yes | `"governance"` |
 | repository | string | Yes | Repository name |
 | branch | string | No | Branch name |
 | componentId | string | Yes | Component ID |
@@ -299,13 +308,13 @@ Get context history for a component.
 **Parameters:**
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| operation | string | Yes | `"history"` |
+| type | string | Yes | `"history"` |
 | repository | string | Yes | Repository name |
 | branch | string | No | Branch name |
-| componentId | string | No | Component ID (optional) |
-| startDate | string | No | ISO date start |
-| endDate | string | No | ISO date end |
-| limit | integer | No | Max results |
+| componentId | string | Yes | Component ID (the alias `itemId` is also accepted) |
+
+There is no date range and no `limit`: the operation returns the component's
+context entries in full.
 
 #### tags
 
@@ -314,17 +323,23 @@ Query tags and tagged items.
 **Parameters:**
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| operation | string | Yes | `"tags"` |
+| type | string | Yes | `"tags"` |
 | repository | string | Yes | Repository name |
 | branch | string | No | Branch name |
-| tagId | string | No | Specific tag ID |
-| category | string | No | Tag category filter |
+| tagId | string | No | Restrict to a single tag ID |
+
+There is no category filter on this operation; a tag's category is returned as
+data, not queried by.
 
 ---
 
 ## associate
 
 Create relationships between entities.
+
+The association is named by `type`; `associationType` is accepted as an alias.
+`sourceId`/`targetId` name the two ends for every association; the named forms
+below are accepted instead where they read more clearly.
 
 ### Operations
 
@@ -335,11 +350,11 @@ Associate a file with a component.
 **Parameters:**
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| operation | string | Yes | `"file-component"` |
+| type | string | Yes | `"file-component"` |
 | repository | string | Yes | Repository name |
 | branch | string | No | Branch name |
-| fileId | string | Yes | File ID |
-| componentId | string | Yes | Component ID |
+| fileId | string | Yes | File ID (or `sourceId`) |
+| componentId | string | Yes | Component ID (or `targetId`) |
 
 #### tag-item
 
@@ -348,17 +363,17 @@ Tag an item.
 **Parameters:**
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| operation | string | Yes | `"tag-item"` |
+| type | string | Yes | `"tag-item"` |
 | repository | string | Yes | Repository name |
 | branch | string | No | Branch name |
 | tagId | string | Yes | Tag ID |
 | itemId | string | Yes | Item ID to tag |
-| itemType | string | Yes | Item type (e.g., "Component") |
+| itemType | string | No | Item type (default: `"Component"`) |
 
 **Example:**
 ```json
 {
-  "operation": "tag-item",
+  "type": "tag-item",
   "repository": "my-app",
   "tagId": "backend",
   "itemId": "auth-service",
@@ -372,6 +387,19 @@ Tag an item.
 
 Run graph algorithms on the memory graph.
 
+The algorithm is named by `type`; `algorithm` is accepted as an alias. All four
+algorithms take `repository`, `branch` and the optional table scoping below;
+the rows after that are the ones that algorithm alone reads.
+
+**Common parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| type | string | Yes | `"pagerank"`, `"k-core"`, `"louvain"`, or `"shortest-path"` |
+| repository | string | Yes | Repository name |
+| branch | string | No | Branch name |
+| nodeTableNames | array | No | Node tables to run over |
+| relationshipTableNames | array | No | Relationship tables to run over |
+
 ### Operations
 
 #### pagerank
@@ -381,10 +409,11 @@ Calculate PageRank scores for components.
 **Parameters:**
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| operation | string | Yes | `"pagerank"` |
-| repository | string | Yes | Repository name |
-| branch | string | No | Branch name |
-| limit | integer | No | Top N results |
+| damping | number | No | Damping factor (default: 0.85) |
+| maxIterations | integer | No | Iteration cap (default: 20) |
+
+There is no `limit`: the algorithm returns every node it scored, ranked. Cut
+the list in the caller.
 
 **Response:**
 ```json
@@ -403,21 +432,13 @@ Calculate k-core decomposition.
 **Parameters:**
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| operation | string | Yes | `"k-core"` |
-| repository | string | Yes | Repository name |
-| branch | string | No | Branch name |
-| k | integer | No | Core number threshold |
+| k | integer | No | Core number threshold (default: 2) |
 
 #### louvain
 
 Run Louvain community detection.
 
-**Parameters:**
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| operation | string | Yes | `"louvain"` |
-| repository | string | Yes | Repository name |
-| branch | string | No | Branch name |
+Takes the common parameters and nothing else.
 
 #### shortest-path
 
@@ -426,17 +447,18 @@ Find shortest path between components.
 **Parameters:**
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| operation | string | Yes | `"shortest-path"` |
-| repository | string | Yes | Repository name |
-| branch | string | No | Branch name |
-| fromId | string | Yes | Source component ID |
-| toId | string | Yes | Target component ID |
+| startNodeId | string | Yes | Source component ID (the alias `startId` is also accepted) |
+| endNodeId | string | Yes | Target component ID (the alias `endId` is also accepted) |
 
 ---
 
 ## detect
 
 Detect patterns in the memory graph.
+
+The pattern is named by `type`; `pattern` is accepted as an alias. Each
+operation takes `repository` and `branch`; `nodeTableNames` and
+`relationshipTableNames` narrow the tables it walks.
 
 ### Operations
 
@@ -447,7 +469,7 @@ Detect circular dependencies.
 **Parameters:**
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| operation | string | Yes | `"cycles"` |
+| type | string | Yes | `"cycles"` |
 | repository | string | Yes | Repository name |
 | branch | string | No | Branch name |
 
@@ -468,7 +490,7 @@ Detect disconnected component groups.
 **Parameters:**
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| operation | string | Yes | `"islands"` |
+| type | string | Yes | `"islands"` |
 | repository | string | Yes | Repository name |
 | branch | string | No | Branch name |
 
@@ -479,7 +501,7 @@ Find strongly connected components.
 **Parameters:**
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| operation | string | Yes | `"strongly-connected"` |
+| type | string | Yes | `"strongly-connected"` |
 | repository | string | Yes | Repository name |
 | branch | string | No | Branch name |
 
@@ -490,15 +512,30 @@ Find weakly connected components.
 **Parameters:**
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| operation | string | Yes | `"weakly-connected"` |
+| type | string | Yes | `"weakly-connected"` |
 | repository | string | Yes | Repository name |
 | branch | string | No | Branch name |
+
+#### path
+
+Find the path between two components.
+
+**Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| type | string | Yes | `"path"` |
+| repository | string | Yes | Repository name |
+| branch | string | No | Branch name |
+| startNodeId | string | Yes | Source component ID |
+| endNodeId | string | Yes | Target component ID |
 
 ---
 
 ## introspect
 
 Inspect the database schema and statistics.
+
+The operation is named by `query`; `operation` is accepted as an alias.
 
 ### Operations
 
@@ -509,7 +546,7 @@ Get all node labels (entity types).
 **Parameters:**
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| operation | string | Yes | `"labels"` |
+| query | string | Yes | `"labels"` |
 | repository | string | Yes | Repository name |
 | branch | string | No | Branch name |
 
@@ -520,7 +557,7 @@ Get entity counts by type.
 **Parameters:**
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| operation | string | Yes | `"count"` |
+| query | string | Yes | `"count"` |
 | repository | string | Yes | Repository name |
 | branch | string | No | Branch name |
 
@@ -545,10 +582,10 @@ Get properties for an entity type.
 **Parameters:**
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| operation | string | Yes | `"properties"` |
+| query | string | Yes | `"properties"` |
 | repository | string | Yes | Repository name |
 | branch | string | No | Branch name |
-| entityType | string | Yes | Entity type |
+| target | string | Yes | Entity type to describe (the alias `label` is also accepted) |
 
 #### indexes
 
@@ -557,14 +594,29 @@ Get database indexes.
 **Parameters:**
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| operation | string | Yes | `"indexes"` |
+| query | string | Yes | `"indexes"` |
 | repository | string | Yes | Repository name |
+
+#### statistics
+
+Get graph and database statistics.
+
+**Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| query | string | Yes | `"statistics"` |
+| repository | string | Yes | Repository name |
+| branch | string | No | Branch name |
 
 ---
 
 ## bulk-import
 
 Batch import operations.
+
+The entity kind is named by `type`; `entityType` (the singular) is accepted as
+an alias. The batch itself is passed as `items`, or as the key matching the
+kind — `components`, `decisions` or `rules`.
 
 ### Operations
 
@@ -575,15 +627,15 @@ Import multiple components.
 **Parameters:**
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| operation | string | Yes | `"components"` |
+| type | string | Yes | `"components"` |
 | repository | string | Yes | Repository name |
 | branch | string | No | Branch name |
-| items | array | Yes | Array of component data |
+| items | array | Yes | Array of component data (or `components`) |
 
 **Example:**
 ```json
 {
-  "operation": "components",
+  "type": "components",
   "repository": "my-app",
   "items": [
     {"id": "svc-1", "name": "Service 1", "kind": "service"},
@@ -594,17 +646,24 @@ Import multiple components.
 
 #### decisions
 
-Import multiple decisions.
+Import multiple decisions. Same shape, with `type: "decisions"` and the batch
+under `items` or `decisions`.
 
 #### rules
 
-Import multiple rules.
+Import multiple rules. Same shape, with `type: "rules"` and the batch under
+`items` or `rules`.
 
 ---
 
 ## search
 
 Search across the memory bank.
+
+The search kind is named by `mode`; `searchType` is accepted as an alias.
+`mode` is one of `fulltext`, `semantic`, `hybrid`, `by-name` or `by-kind`, and
+defaults to `fulltext` when omitted. `threshold` (default `0.0`) applies to the
+`semantic` and `hybrid` modes.
 
 ### Operations
 
@@ -615,17 +674,17 @@ Full-text search across entities.
 **Parameters:**
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| operation | string | Yes | `"fulltext"` |
+| mode | string | No | `"fulltext"` (default: `"fulltext"`) |
 | repository | string | Yes | Repository name |
 | branch | string | No | Branch name |
 | query | string | Yes | Search query |
 | entityTypes | array | No | Limit to specific types |
-| limit | integer | No | Max results |
+| limit | integer | No | Max results (default: 20) |
 
 **Example:**
 ```json
 {
-  "operation": "fulltext",
+  "mode": "fulltext",
   "repository": "my-app",
   "query": "authentication",
   "entityTypes": ["component", "decision"],
@@ -698,7 +757,11 @@ Analyze memory bank for optimization opportunities.
 | operation | string | Yes | `"analyze"` |
 | repository | string | Yes | Repository name |
 | branch | string | No | Branch name |
-| useLlm | boolean | No | Use LLM for enhanced analysis |
+| enableMCPSampling | boolean | No | Analyze by sampling through MCP |
+| samplingStrategy | string | No | `"representative"`, `"problematic"`, `"recent"`, or `"diverse"` |
+
+There is no `useLlm`. The tool's analysis is rule-based; the LLM path is on the
+`MemoryOptimizationAgent` API and is not reachable from the wire.
 
 **Response:**
 ```json
@@ -733,9 +796,14 @@ Execute optimization with a strategy.
 | operation | string | Yes | `"optimize"` |
 | repository | string | Yes | Repository name |
 | branch | string | No | Branch name |
-| strategy | string | No | `"conservative"`, `"balanced"`, `"aggressive"` |
-| dryRun | boolean | No | Simulate without changes |
-| useLlm | boolean | No | Use LLM for planning |
+| strategy | string | No | `"conservative"`, `"balanced"`, `"aggressive"` (unset means `COGNITIVE_FABRIC_OPTIMIZER_DEFAULT_STRATEGY`) |
+| dryRun | boolean | No | Simulate without changes (default: true) |
+| confirm | boolean | Yes | Required when `dryRun` is false |
+| maxDeletions | integer | No | Can only lower the effective limit, never raise it |
+| focusAreas | array | No | Restrict the plan to specific cleanup areas |
+| preserveCategories | array | No | Tag categories to keep regardless of the plan |
+| analysisId | string | No | Reuse a cached `analyze` result |
+| snapshotFailurePolicy | string | No | `"abort"`, `"continue"`, or `"warn"` (default: `"warn"`) |
 
 #### rollback
 
@@ -759,7 +827,131 @@ List available snapshots.
 | operation | string | Yes | `"list-snapshots"` |
 | repository | string | Yes | Repository name |
 | branch | string | No | Branch name |
-| limit | integer | No | Max results |
+
+There is no `limit`: the operation returns the repository's snapshots in full.
+
+#### create-snapshot
+
+Create a snapshot without running an optimization.
+
+**Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| operation | string | Yes | `"create-snapshot"` |
+| repository | string | Yes | Repository name |
+| branch | string | No | Branch name |
+| description | string | No | Description stored with the snapshot |
+
+---
+
+## fabric
+
+The code-evolution memory: ingest a project's symbols, record a change trace,
+and link the two. Every operation takes `repository` and `branch`.
+
+### Operations
+
+#### ingest-ast
+
+Parse a project directory into `Symbol` nodes and their relationships.
+
+**Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| operation | string | Yes | `"ingest-ast"` |
+| repository | string | Yes | Repository name |
+| path | string | Yes | Project directory to scan |
+| branch | string | No | Branch name |
+
+#### dream
+
+Run the consolidation pass over the ingested graph.
+
+**Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| operation | string | Yes | `"dream"` |
+| repository | string | Yes | Repository name |
+| branch | string | No | Branch name |
+
+#### record-event
+
+Record a change event for the evolution graph.
+
+**Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| operation | string | Yes | `"record-event"` |
+| repository | string | Yes | Repository name |
+| eventSummary | string | Yes | Short summary of the change |
+| eventObservation | string | No | Longer observation |
+| itemId | string | No | Event ID; generated when omitted |
+| branch | string | No | Branch name |
+
+#### query-evolution
+
+Read the evolution history for an item.
+
+**Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| operation | string | Yes | `"query-evolution"` |
+| repository | string | Yes | Repository name |
+| itemId | string | Yes | Item ID |
+| itemType | string | No | Item type (default: `"Symbol"`) |
+| branch | string | No | Branch name |
+
+#### query-rationale
+
+Read the rationale linked to an item.
+
+**Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| operation | string | Yes | `"query-rationale"` |
+| repository | string | Yes | Repository name |
+| itemId | string | Yes | Item ID |
+| branch | string | No | Branch name |
+
+#### link-evolution
+
+Link an item to the item it supersedes.
+
+**Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| operation | string | Yes | `"link-evolution"` |
+| repository | string | Yes | Repository name |
+| currentId | string | Yes | The newer item |
+| previousId | string | Yes | The item it supersedes |
+| itemType | string | No | Item type (default: `"Symbol"`) |
+| branch | string | No | Branch name |
+
+#### link-to-file
+
+Link a symbol to the file that defines it.
+
+**Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| operation | string | Yes | `"link-to-file"` |
+| repository | string | Yes | Repository name |
+| symbolId | string | Yes | Symbol ID |
+| fileId | string | Yes | File ID |
+| branch | string | No | Branch name |
+
+#### link-to-symbol
+
+Link an evolution trace to a symbol.
+
+**Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| operation | string | Yes | `"link-to-symbol"` |
+| repository | string | Yes | Repository name |
+| traceId | string | Yes | Trace ID |
+| symbolId | string | Yes | Symbol ID |
+| branch | string | No | Branch name |
 
 ---
 

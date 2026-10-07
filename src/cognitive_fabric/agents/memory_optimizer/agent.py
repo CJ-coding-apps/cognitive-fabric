@@ -352,8 +352,9 @@ class MemoryOptimizationAgent(BaseMemoryAgent):
         Returns:
             Optimization results.
         """
-        strategy_str = kwargs.get("strategy", default_settings.optimizer_default_strategy)
-        strategy = OptimizationStrategy(strategy_str)
+        strategy = OptimizationStrategy(
+            kwargs.get("strategy", default_settings.optimizer_default_strategy)
+        )
 
         return await self.optimize(
             repository=repository,

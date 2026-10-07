@@ -82,74 +82,42 @@ Test optimization without making changes:
 
 ### Full Optimization
 
-Execute optimization with automatic snapshot:
+Execute optimization with automatic snapshot. A non-dry-run `optimize` needs
+`confirm`, so that a real deletion is never one forgotten flag away:
 
 ```json
 {
   "operation": "optimize",
   "repository": "my-app",
   "branch": "main",
-  "strategy": "balanced",
-  "dryRun": false
+  "strategy": "conservative",
+  "dryRun": false,
+  "confirm": true
 }
 ```
 
 ## Optimization Strategies
 
-### Conservative
+<!-- BEGIN GENERATED: strategy table -->
+| Strategy | Stale threshold (days) | Max deletions | Deletes orphaned tags | Requires no dependents |
+|----------|------------------------|---------------|-----------------------|-----------------------|
+| conservative | 90 | 10 | no | yes |
+| **balanced** (default on an unrecognised strategy name) | 60 | 50 | yes | no |
+| aggressive | 30 | 100 | yes | no |
 
-Best for production systems where stability is critical.
+The strategy that applies when none is requested is `COGNITIVE_FABRIC_OPTIMIZER_DEFAULT_STRATEGY`, which is `conservative`.
+<!-- END GENERATED: strategy table -->
 
-| Setting | Value |
-|---------|-------|
-| Stale threshold | 180 days |
-| Max deletions | 5 |
-| Delete orphaned tags | No |
-| Require no dependents | Yes |
+A deployment can impose a ceiling below any of these with
+`COGNITIVE_FABRIC_OPTIMIZER_MAX_DELETIONS`; see the configuration guide. The
+cap applies under every strategy, and a caller's own `maxDeletions` can only
+lower the effective limit, never raise it.
 
 ```json
 {
   "operation": "optimize",
   "repository": "my-app",
   "strategy": "conservative"
-}
-```
-
-### Balanced (Default)
-
-Good for regular maintenance with moderate cleanup.
-
-| Setting | Value |
-|---------|-------|
-| Stale threshold | 90 days |
-| Max deletions | 20 |
-| Delete orphaned tags | Yes |
-| Require no dependents | No |
-
-```json
-{
-  "operation": "optimize",
-  "repository": "my-app",
-  "strategy": "balanced"
-}
-```
-
-### Aggressive
-
-For major cleanup or before migrations.
-
-| Setting | Value |
-|---------|-------|
-| Stale threshold | 30 days |
-| Max deletions | 50 |
-| Delete orphaned tags | Yes |
-| Require no dependents | No |
-
-```json
-{
-  "operation": "optimize",
-  "repository": "my-app",
-  "strategy": "aggressive"
 }
 ```
 
@@ -239,8 +207,7 @@ Before any optimization execution (non-dry-run), a snapshot is automatically cre
 {
   "operation": "list-snapshots",
   "repository": "my-app",
-  "branch": "main",
-  "limit": 10
+  "branch": "main"
 }
 ```
 
@@ -259,24 +226,21 @@ Restore to a previous snapshot:
 
 ## LLM-Enhanced Optimization
 
-For more intelligent analysis, enable LLM support:
+The agent's own analysis and planning are rule-based. The rule-based path is
+what the MCP tool exposes; the LLM path is reached through the
+`MemoryOptimizationAgent` API, which takes an `llm_client`, not through a tool
+argument.
 
 ### Setup
 
-1. Configure your LLM provider:
-   ```bash
-   export COGNITIVE_FABRIC_LLM_PROVIDER=openai
-   export OPENAI_API_KEY=sk-your-key
-   ```
+Configure the provider and name a model — there is no default, so the call
+fails and says so rather than picking one for you:
 
-2. Enable LLM in requests:
-   ```json
-   {
-     "operation": "analyze",
-     "repository": "my-app",
-     "useLlm": true
-   }
-   ```
+```bash
+export COGNITIVE_FABRIC_LLM_PROVIDER=openai
+export OPENAI_API_KEY=sk-your-key
+export COGNITIVE_FABRIC_OPENAI_MODEL=<model id from https://platform.openai.com/docs/models>
+```
 
 ### LLM Benefits
 
@@ -285,52 +249,21 @@ For more intelligent analysis, enable LLM support:
 - **Risk Assessment**: Better judgment on deletion safety
 - **Contextual Recommendations**: More specific action items
 
-### LLM Response Enhancement
-
-With LLM enabled, you get additional insights:
-
-```json
-{
-  "healthScore": 78,
-  "issues": [...],
-  "llmAnalysis": {
-    "assessment": "The memory bank shows signs of organic growth with some technical debt. The authentication system has multiple deprecated components suggesting a recent migration.",
-    "keyObservations": [
-      "Auth system underwent migration, leaving deprecated components",
-      "Database components tightly coupled, consider modularization"
-    ],
-    "suggestedPriorities": [
-      "Clean up post-migration auth components",
-      "Address circular dependency in payment system"
-    ]
-  }
-}
-```
-
 ## CLI Usage
+
+The optimizer is reached through `optimize`; the CLI has no separate per-operation
+commands for it.
 
 ### Analyze from CLI
 
 ```bash
-cognitive_fabric optimize /path/to/db my-repo --strategy balanced --dry-run
+cognitive-fabric optimize /path/to/db my-repo --strategy conservative --dry-run
 ```
 
 ### Full Optimization
 
 ```bash
-cognitive_fabric optimize /path/to/db my-repo --strategy balanced
-```
-
-### Rollback from CLI
-
-```bash
-cognitive_fabric rollback /path/to/db my-repo snap-20240115-103045
-```
-
-### List Snapshots
-
-```bash
-cognitive_fabric list-snapshots /path/to/db my-repo
+cognitive-fabric optimize /path/to/db my-repo --strategy conservative
 ```
 
 ## Best Practices
@@ -391,14 +324,19 @@ Check:
 
 ## API Reference
 
+These are the keys the `memory-optimizer` tool accepts. There is no `useLlm`:
+the tool's analysis and planning are rule-based, and the LLM path is on the
+agent API, not on the wire.
+
 ### Analyze
 
 ```json
 {
   "operation": "analyze",
   "repository": "string",
-  "branch": "string (optional)",
-  "useLlm": "boolean (optional)"
+  "branch": "string (optional, default \"main\")",
+  "enableMCPSampling": "boolean (optional)",
+  "samplingStrategy": "representative | problematic | recent | diverse"
 }
 ```
 
@@ -408,10 +346,15 @@ Check:
 {
   "operation": "optimize",
   "repository": "string",
-  "branch": "string (optional)",
+  "branch": "string (optional, default \"main\")",
   "strategy": "conservative | balanced | aggressive",
-  "dryRun": "boolean (optional)",
-  "useLlm": "boolean (optional)"
+  "dryRun": "boolean (optional, default true)",
+  "confirm": "boolean (required when dryRun is false)",
+  "maxDeletions": "integer (optional, can only lower the effective cap)",
+  "focusAreas": ["stale-detection", "redundancy-removal", "relationship-cleanup", "dependency-optimization", "tag-consolidation", "orphan-removal"],
+  "preserveCategories": ["string"],
+  "analysisId": "string (optional, reuses a cached analyze result)",
+  "snapshotFailurePolicy": "abort | continue | warn"
 }
 ```
 
@@ -432,7 +375,17 @@ Check:
 {
   "operation": "list-snapshots",
   "repository": "string",
+  "branch": "string (optional)"
+}
+```
+
+### Create Snapshot
+
+```json
+{
+  "operation": "create-snapshot",
+  "repository": "string",
   "branch": "string (optional)",
-  "limit": "integer (optional)"
+  "description": "string (optional)"
 }
 ```

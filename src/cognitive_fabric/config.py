@@ -32,8 +32,11 @@ class Settings(BaseSettings):
     # could answer `initialize`. One setting, one name.
     db_path: Optional[str] = None
 
-    # Logging
-    log_level: str = "INFO"
+    # Logging. Both are read by `configure_logging` in the server entry points,
+    # which is where the docs' claims about them are made true: they used to be
+    # declared and read by nothing, so the Dockerfile set them and the process
+    # logged by the function's own defaults regardless.
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     log_json: bool = True
 
     # HTTP-stream transport (opt-in; stdio remains the default). Bind localhost

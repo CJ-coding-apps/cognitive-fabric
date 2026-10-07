@@ -429,7 +429,7 @@ Common fixtures are defined in `tests/conftest.py`:
 ### Debug Logging
 
 ```bash
-COGNITIVE_FABRIC_LOG_LEVEL=DEBUG cognitive_fabric serve
+COGNITIVE_FABRIC_LOG_LEVEL=DEBUG cognitive-fabric serve
 ```
 
 ### Interactive Debugging

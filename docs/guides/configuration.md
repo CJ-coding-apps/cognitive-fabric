@@ -10,9 +10,9 @@ Cognitive-Fabric is configured primarily through environment variables. You can 
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `COGNITIVE_FABRIC_DB_PATH` | `./data/cognitive_fabric.db` | Path to KuzuDB database directory |
+| `COGNITIVE_FABRIC_DB_PATH` | *(none)* | Path to the KuzuDB database directory. Required by the server; the CLI's `--db-path` sets the same thing. |
 | `COGNITIVE_FABRIC_LOG_LEVEL` | `INFO` | Logging level (DEBUG, INFO, WARNING, ERROR) |
-| `COGNITIVE_FABRIC_LOG_FORMAT` | `json` | Log format (`json` or `text`) |
+| `COGNITIVE_FABRIC_LOG_JSON` | `true` | `true` for JSON logs, `false` for plain text |
 
 ### LLM Settings (for Memory Optimizer)
 
@@ -38,7 +38,7 @@ COGNITIVE_FABRIC_DB_PATH=/app/data/memory.db
 
 # Logging
 COGNITIVE_FABRIC_LOG_LEVEL=INFO
-COGNITIVE_FABRIC_LOG_FORMAT=json
+COGNITIVE_FABRIC_LOG_JSON=true
 
 # LLM (optional -- only the memory optimizer calls a provider). There is no
 # default model, so name one; without it the call stops and says so. The model
@@ -53,21 +53,19 @@ COGNITIVE_FABRIC_OPENAI_MODEL=<model id from https://platform.openai.com/docs/mo
 # COGNITIVE_FABRIC_ANTHROPIC_MODEL=<model id from https://docs.anthropic.com/en/docs/about-claude/models>
 ```
 
-## Configuration File
-
 ## CLI Configuration
 
 The CLI supports configuration through command-line options:
 
 ```bash
 # Specify database path
-cognitive_fabric serve --db-path /path/to/database
+cognitive-fabric serve --db-path /path/to/database
 
 # Set log level
-cognitive_fabric serve --log-level DEBUG
+cognitive-fabric serve --log-level DEBUG
 
 # Use JSON logs
-cognitive_fabric serve --json-logs
+cognitive-fabric serve --json-logs
 ```
 
 ## Docker Configuration
@@ -81,7 +79,7 @@ services:
     environment:
       - COGNITIVE_FABRIC_DB_PATH=/app/data/cognitive_fabric.db
       - COGNITIVE_FABRIC_LOG_LEVEL=INFO
-      - COGNITIVE_FABRIC_LOG_FORMAT=json
+      - COGNITIVE_FABRIC_LOG_JSON=true
       - OPENAI_API_KEY=${OPENAI_API_KEY}
 ```
 
@@ -119,7 +117,7 @@ Add to your Claude Code MCP settings:
 {
   "mcpServers": {
     "cognitive_fabric": {
-      "command": "cognitive_fabric-server",
+      "command": "cognitive-fabric-server",
       "env": {
         "COGNITIVE_FABRIC_DB_PATH": "/Users/you/cognitive_fabric-data",
         "COGNITIVE_FABRIC_LOG_LEVEL": "INFO"
@@ -161,25 +159,27 @@ Add to your Claude Code MCP settings:
 
 ### JSON Log Format
 
-When `COGNITIVE_FABRIC_LOG_FORMAT=json`:
+When `COGNITIVE_FABRIC_LOG_JSON=true` (the default), one object per line on
+stderr. The message key is `event`; there is no `logger` field, because
+structlog's logger-name processor needs a stdlib logger and this package logs
+through `PrintLogger`:
 
 ```json
 {
-  "timestamp": "2024-01-15T10:30:00.000Z",
-  "level": "info",
-  "logger": "cognitive_fabric.mcp.server",
-  "message": "Tool called",
   "tool": "entity",
-  "operation": "create"
+  "operation": "create",
+  "event": "Tool called",
+  "level": "info",
+  "timestamp": "2026-10-07T01:06:31.989849Z"
 }
 ```
 
 ### Text Log Format
 
-When `COGNITIVE_FABRIC_LOG_FORMAT=text`:
+When `COGNITIVE_FABRIC_LOG_JSON=false`:
 
 ```
-2024-01-15 10:30:00 [INFO] cognitive_fabric.mcp.server: Tool called tool=entity operation=create
+2026-10-07T01:06:31.990526Z [info     ] Tool called  operation=create tool=entity
 ```
 
 ## Database Configuration
@@ -196,7 +196,7 @@ The database path can be:
 The database is automatically initialized with the schema on first use. To manually initialize:
 
 ```bash
-cognitive_fabric init /path/to/database
+cognitive-fabric init /path/to/database
 ```
 
 ### Multiple Databases
@@ -205,27 +205,43 @@ You can run multiple instances with different databases:
 
 ```bash
 # Instance 1
-COGNITIVE_FABRIC_DB_PATH=/data/project1.db cognitive_fabric serve
+COGNITIVE_FABRIC_DB_PATH=/data/project1.db cognitive-fabric serve
 
 # Instance 2
-COGNITIVE_FABRIC_DB_PATH=/data/project2.db cognitive_fabric serve
+COGNITIVE_FABRIC_DB_PATH=/data/project2.db cognitive-fabric serve
 ```
 
 ## Memory Optimizer Configuration
 
 ### Strategy Settings
 
-| Strategy | Stale Days | Max Deletions | Description |
-|----------|------------|---------------|-------------|
-| conservative | 180 | 5 | Minimal changes, safest |
-| balanced | 90 | 20 | Moderate optimization |
-| aggressive | 30 | 50 | Maximum cleanup |
+<!-- BEGIN GENERATED: strategy table -->
+| Strategy | Stale threshold (days) | Max deletions | Deletes orphaned tags | Requires no dependents |
+|----------|------------------------|---------------|-----------------------|-----------------------|
+| conservative | 90 | 10 | no | yes |
+| **balanced** (default on an unrecognised strategy name) | 60 | 50 | yes | no |
+| aggressive | 30 | 100 | yes | no |
 
-### Custom Strategy Configuration
+The strategy that applies when none is requested is `COGNITIVE_FABRIC_OPTIMIZER_DEFAULT_STRATEGY`, which is `conservative`.
+<!-- END GENERATED: strategy table -->
+
+### Capping how much one run may delete
+
+The strategy's limit is what the optimizer would do if left to itself. A
+deployment can impose a lower ceiling that no strategy and no caller can lift:
 
 ```bash
+# Never remove more than 30 entities in a single optimization run.
 COGNITIVE_FABRIC_OPTIMIZER_MAX_DELETIONS=30
-COGNITIVE_FABRIC_OPTIMIZER_STALE_DAYS=60
+```
+
+It is a hard cap, enforced where the deletions are executed. Unset (the
+default) means the strategy's own limit applies. The caller's `maxDeletions`
+argument can lower the effective limit further but never raise it:
+
+```
+effective limit = min(strategy limit, COGNITIVE_FABRIC_OPTIMIZER_MAX_DELETIONS,
+                      caller's maxDeletions)
 ```
 
 ## Security Configuration
@@ -240,25 +256,12 @@ Use environment variables or secret management:
 # From environment
 export OPENAI_API_KEY=$(cat ~/.secrets/openai-key)
 
-# From file
-OPENAI_API_KEY=$(< /run/secrets/openai_key)
+# From a file, expanded by the shell
+export OPENAI_API_KEY=$(< /run/secrets/openai_key)
 ```
 
-### Docker Secrets
-
-```yaml
-# docker-compose.yml
-services:
-  cognitive_fabric:
-    secrets:
-      - openai_key
-    environment:
-      - OPENAI_API_KEY_FILE=/run/secrets/openai_key
-
-secrets:
-  openai_key:
-    file: ./secrets/openai_key.txt
-```
+`OPENAI_API_KEY` is read by the OpenAI SDK. There is no separate file-reading
+setting: the shell above, or Docker's own secret mounting, is the mechanism.
 
 ## Performance Tuning
 
@@ -276,10 +279,10 @@ docker run -m 512m cognitive-fabric:ci
 
 ```bash
 # Check effective configuration
-cognitive_fabric info /path/to/database
+cognitive-fabric info /path/to/database
 
 # Debug mode
-COGNITIVE_FABRIC_LOG_LEVEL=DEBUG cognitive_fabric serve
+COGNITIVE_FABRIC_LOG_LEVEL=DEBUG cognitive-fabric serve
 ```
 
 ### Common Issues
@@ -293,7 +296,7 @@ chmod 755 /path/to/data
 **Environment variables not loaded:**
 ```bash
 # Verify variables are set
-env | grep KUZUMEMPY
+env | grep COGNITIVE_FABRIC_
 ```
 
 **Docker volume issues:**

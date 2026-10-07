@@ -61,7 +61,7 @@ missing SDK instead of failing on import.
 ### 3. Run the Server
 
 ```bash
-cognitive_fabric serve
+cognitive-fabric serve
 ```
 
 ## Integrating with Claude Code
@@ -93,7 +93,7 @@ Add Cognitive-Fabric to your Claude Code MCP settings:
 {
   "mcpServers": {
     "cognitive_fabric": {
-      "command": "cognitive_fabric-server"
+      "command": "cognitive-fabric-server"
     }
   }
 }

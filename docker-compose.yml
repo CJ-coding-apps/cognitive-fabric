@@ -13,7 +13,7 @@ services:
     environment:
       - COGNITIVE_FABRIC_DB_PATH=/app/data/cognitive_fabric.db
       - COGNITIVE_FABRIC_LOG_LEVEL=DEBUG
-      - COGNITIVE_FABRIC_LOG_FORMAT=text
+      - COGNITIVE_FABRIC_LOG_JSON=false
     stdin_open: true
     tty: true
     command: python -m cognitive_fabric.main
@@ -107,7 +107,7 @@ services:
     environment:
       - COGNITIVE_FABRIC_DB_PATH=/app/data/cognitive_fabric.db
       - COGNITIVE_FABRIC_LOG_LEVEL=INFO
-      - COGNITIVE_FABRIC_LOG_FORMAT=json
+      - COGNITIVE_FABRIC_LOG_JSON=true
     stdin_open: true
     tty: true
 

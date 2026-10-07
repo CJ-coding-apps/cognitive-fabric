@@ -216,10 +216,10 @@ This enables:
 └─────────────────┘ └─────────────────┘ └─────────────────────────┘
 ```
 
-**Strategies:**
-- **Conservative**: 6-month stale threshold, max 5 deletions
-- **Balanced**: 3-month stale threshold, max 20 deletions
-- **Aggressive**: 1-month stale threshold, max 50 deletions
+**Strategies:** the table is generated from `STRATEGY_CONFIGS` and embedded in
+`docs/guides/configuration.md` and `docs/guides/memory-optimizer.md`, so the
+numbers have one home. A restatement here was wrong three times over: it gave
+every strategy a deletion limit lower than the code's.
 
 ## Design Patterns
 

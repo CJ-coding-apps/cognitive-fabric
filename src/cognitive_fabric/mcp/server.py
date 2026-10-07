@@ -285,15 +285,24 @@ async def run_http_server(
     app = create_http_app(server, host, port)
 
     logger.info("Starting MCP server with HTTP transport", host=host, port=port)
-    config = uvicorn.Config(app, host=host, port=port, log_level="info")
+    # uvicorn takes its level in lower case; it was the literal "info" here, so
+    # COGNITIVE_FABRIC_LOG_LEVEL did not reach the HTTP transport's own logs.
+    config = uvicorn.Config(
+        app, host=host, port=port, log_level=settings.log_level.lower()
+    )
     await uvicorn.Server(config).serve()
 
 
 def main() -> None:
     """Main entry point for the MCP server."""
-    # Configure logging
+    # Configure logging from settings, as `cognitive_fabric.main:main` does --
+    # this is the `python -m cognitive_fabric.mcp.server` path to the same
+    # server, and it configured logging with no arguments, so the level and
+    # format the docs describe reached neither entry point.
+    from cognitive_fabric.config import settings
     from cognitive_fabric.utils.logger import configure_logging
-    configure_logging()
+
+    configure_logging(json_output=settings.log_json, log_level=settings.log_level)
 
     logger.info("Cognitive Fabric MCP Server starting")
 

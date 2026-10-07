@@ -11,13 +11,13 @@ pip install cognitive-fabric
 ```
 
 Two commands are available:
-- `cognitive_fabric` - Main CLI with all commands
-- `cognitive_fabric-server` - Direct server startup
+- `cognitive-fabric` - Main CLI with all commands
+- `cognitive-fabric-server` - Direct server startup
 
 ## Global Options
 
 ```bash
-cognitive_fabric [OPTIONS] COMMAND [ARGS]...
+cognitive-fabric [OPTIONS] COMMAND [ARGS]...
 
 Options:
   --version   Show version and exit
@@ -29,10 +29,11 @@ Options:
 
 ### serve
 
-Start the MCP server with stdio transport.
+Start the MCP server. stdio by default; `--transport http` serves
+streamable-HTTP at `/mcp`.
 
 ```bash
-cognitive_fabric serve [OPTIONS]
+cognitive-fabric serve [OPTIONS]
 ```
 
 **Options:**
@@ -40,27 +41,32 @@ cognitive_fabric serve [OPTIONS]
 | Option | Short | Type | Default | Description |
 |--------|-------|------|---------|-------------|
 | `--db-path` | `-d` | PATH | env var | Path to KuzuDB database |
-| `--log-level` | `-l` | CHOICE | INFO | Logging level |
-| `--json-logs` | | FLAG | false | Output logs as JSON |
+| `--log-level` | `-l` | CHOICE | env var | Logging level. Unset means `COGNITIVE_FABRIC_LOG_LEVEL`. |
+| `--json-logs` | | FLAG | env var | Output logs as JSON; `--no-json-logs` for plain text. Unset means `COGNITIVE_FABRIC_LOG_JSON`. |
+| `--transport` | `-t` | CHOICE | stdio | `stdio` or `http` |
+| `--host` | | TEXT | 127.0.0.1 | Bind host for HTTP transport |
+| `--port` | | INTEGER | 8001 | Bind port for HTTP transport |
 
 **Examples:**
 
 ```bash
 # Start with default settings
-cognitive_fabric serve
+cognitive-fabric serve
 
 # Specify database path
-cognitive_fabric serve --db-path /data/memory.db
+cognitive-fabric serve --db-path /data/memory.db
 
 # Debug mode with JSON logs
-cognitive_fabric serve --log-level DEBUG --json-logs
+cognitive-fabric serve --log-level DEBUG --json-logs
 
 # With verbose output
-cognitive_fabric -v serve --db-path ./data/memory.db
+cognitive-fabric -v serve --db-path ./data/memory.db
 ```
 
 **Environment Variables:**
 - `COGNITIVE_FABRIC_DB_PATH` - Default database path
+- `COGNITIVE_FABRIC_LOG_LEVEL` - Default logging level; `--log-level` overrides it
+- `COGNITIVE_FABRIC_LOG_JSON` - Default log format; `--json-logs`/`--no-json-logs` overrides it
 
 ---
 
@@ -69,7 +75,7 @@ cognitive_fabric -v serve --db-path ./data/memory.db
 Initialize a new KuzuDB database with schema.
 
 ```bash
-cognitive_fabric init [OPTIONS] DB_PATH
+cognitive-fabric init [OPTIONS] DB_PATH
 ```
 
 **Arguments:**
@@ -88,10 +94,10 @@ cognitive_fabric init [OPTIONS] DB_PATH
 
 ```bash
 # Initialize new database
-cognitive_fabric init ./data/memory.db
+cognitive-fabric init ./data/memory.db
 
 # Force reinitialize
-cognitive_fabric init -f ./data/memory.db
+cognitive-fabric init -f ./data/memory.db
 ```
 
 ---
@@ -101,7 +107,7 @@ cognitive_fabric init -f ./data/memory.db
 Show information about a KuzuDB database.
 
 ```bash
-cognitive_fabric info DB_PATH
+cognitive-fabric info DB_PATH
 ```
 
 **Arguments:**
@@ -130,12 +136,47 @@ Entity Counts:
 
 ---
 
+### fabric-ingest
+
+Ingest a project's files and symbols into the memory graph, for the semantic
+layer.
+
+```bash
+cognitive-fabric fabric-ingest [OPTIONS] DB_PATH REPOSITORY
+```
+
+**Arguments:**
+
+| Argument | Type | Description |
+|----------|------|-------------|
+| `DB_PATH` | PATH | Path to database |
+| `REPOSITORY` | STRING | Repository name |
+
+**Options:**
+
+| Option | Short | Type | Default | Description |
+|--------|-------|------|---------|-------------|
+| `--path` | `-p` | PATH | *required* | Project directory to scan |
+| `--branch` | `-b` | STRING | main | Branch name |
+
+**Examples:**
+
+```bash
+# Ingest the current checkout into the graph
+cognitive-fabric fabric-ingest ./data/memory.db my-app --path /path/to/project
+
+# Ingest a branch other than main
+cognitive-fabric fabric-ingest ./data/memory.db my-app -p . -b feature/auth
+```
+
+---
+
 ### optimize
 
 Run memory optimization on a repository.
 
 ```bash
-cognitive_fabric optimize [OPTIONS] DB_PATH REPOSITORY
+cognitive-fabric optimize [OPTIONS] DB_PATH REPOSITORY
 ```
 
 **Arguments:**
@@ -150,25 +191,23 @@ cognitive_fabric optimize [OPTIONS] DB_PATH REPOSITORY
 | Option | Short | Type | Default | Description |
 |--------|-------|------|---------|-------------|
 | `--branch` | `-b` | STRING | main | Branch name |
-| `--strategy` | `-s` | CHOICE | balanced | Optimization strategy |
+| `--strategy` | `-s` | CHOICE | configured | Optimization strategy. Unset means `COGNITIVE_FABRIC_OPTIMIZER_DEFAULT_STRATEGY`. |
 | `--dry-run` | | FLAG | false | Simulate without changes |
 
-**Strategy Choices:**
-- `conservative` - Minimal changes (max 5 deletions)
-- `balanced` - Moderate cleanup (max 20 deletions)
-- `aggressive` - Maximum cleanup (max 50 deletions)
+The strategies and their limits are listed once, in the configuration guide;
+`docs/guides/configuration.md` embeds the generated table.
 
 **Examples:**
 
 ```bash
-# Dry run with balanced strategy
-cognitive_fabric optimize ./data/memory.db my-app --dry-run
+# Dry run with the configured default strategy
+cognitive-fabric optimize ./data/memory.db my-app --dry-run
 
 # Conservative optimization on feature branch
-cognitive_fabric optimize ./data/memory.db my-app -b feature/auth -s conservative
+cognitive-fabric optimize ./data/memory.db my-app -b feature/auth -s conservative
 
 # Aggressive cleanup
-cognitive_fabric optimize ./data/memory.db my-app --strategy aggressive
+cognitive-fabric optimize ./data/memory.db my-app --strategy aggressive
 ```
 
 **Output:**
@@ -194,7 +233,7 @@ Snapshot ID: snap-20240115-103045
 Rollback to a previous snapshot.
 
 ```bash
-cognitive_fabric rollback [OPTIONS] DB_PATH REPOSITORY SNAPSHOT_ID
+cognitive-fabric rollback [OPTIONS] DB_PATH REPOSITORY SNAPSHOT_ID
 ```
 
 **Arguments:**
@@ -215,10 +254,10 @@ cognitive_fabric rollback [OPTIONS] DB_PATH REPOSITORY SNAPSHOT_ID
 
 ```bash
 # Rollback to specific snapshot
-cognitive_fabric rollback ./data/memory.db my-app snap-20240115-103045
+cognitive-fabric rollback ./data/memory.db my-app snap-20240115-103045
 
 # Rollback feature branch
-cognitive_fabric rollback ./data/memory.db my-app snap-001 -b feature/auth
+cognitive-fabric rollback ./data/memory.db my-app snap-001 -b feature/auth
 ```
 
 ---
@@ -228,7 +267,7 @@ cognitive_fabric rollback ./data/memory.db my-app snap-001 -b feature/auth
 List available snapshots for a repository.
 
 ```bash
-cognitive_fabric list-snapshots [OPTIONS] DB_PATH REPOSITORY
+cognitive-fabric list-snapshots [OPTIONS] DB_PATH REPOSITORY
 ```
 
 **Arguments:**
@@ -243,20 +282,18 @@ cognitive_fabric list-snapshots [OPTIONS] DB_PATH REPOSITORY
 | Option | Short | Type | Default | Description |
 |--------|-------|------|---------|-------------|
 | `--branch` | `-b` | STRING | main | Branch name |
-| `--limit` | `-n` | INTEGER | 10 | Max snapshots to show |
 | `--json` | | FLAG | false | Output as JSON |
+
+Every snapshot for the repository is listed; there is no `--limit`.
 
 **Examples:**
 
 ```bash
 # List recent snapshots
-cognitive_fabric list-snapshots ./data/memory.db my-app
-
-# Limit to 5 snapshots
-cognitive_fabric list-snapshots ./data/memory.db my-app -n 5
+cognitive-fabric list-snapshots ./data/memory.db my-app
 
 # JSON output for scripting
-cognitive_fabric list-snapshots ./data/memory.db my-app --json
+cognitive-fabric list-snapshots ./data/memory.db my-app --json
 ```
 
 **Output (text):**
@@ -292,7 +329,7 @@ ID: snap-20240114-091530
 Execute a raw Cypher query against the database.
 
 ```bash
-cognitive_fabric query [OPTIONS] DB_PATH QUERY
+cognitive-fabric query [OPTIONS] DB_PATH QUERY
 ```
 
 **Arguments:**
@@ -312,16 +349,16 @@ cognitive_fabric query [OPTIONS] DB_PATH QUERY
 
 ```bash
 # List all components
-cognitive_fabric query ./data/memory.db "MATCH (n:Component) RETURN n.id, n.name LIMIT 10"
+cognitive-fabric query ./data/memory.db "MATCH (n:Component) RETURN n.id, n.name LIMIT 10"
 
 # Count entities
-cognitive_fabric query ./data/memory.db "MATCH (n:Component) RETURN count(n) as count"
+cognitive-fabric query ./data/memory.db "MATCH (n:Component) RETURN count(n) as count"
 
 # JSON output
-cognitive_fabric query ./data/memory.db "MATCH (n:Tag) RETURN n" --json
+cognitive-fabric query ./data/memory.db "MATCH (n:Tag) RETURN n" --json
 
 # Complex query
-cognitive_fabric query ./data/memory.db "
+cognitive-fabric query ./data/memory.db "
   MATCH (c:Component)-[:DEPENDS_ON]->(d:Component)
   WHERE c.repository = 'my-app'
   RETURN c.name as component, d.name as dependency
@@ -364,11 +401,11 @@ All CLI commands can be run via Docker:
 
 ```bash
 # Run command in container
-docker compose run --rm cognitive_fabric-dev cognitive_fabric COMMAND [ARGS]
+docker compose run --rm cognitive_fabric-dev cognitive-fabric COMMAND [ARGS]
 
 # Examples
-docker compose run --rm cognitive_fabric-dev cognitive_fabric info /app/data/memory.db
-docker compose run --rm cognitive_fabric-dev cognitive_fabric optimize /app/data/memory.db my-app --dry-run
+docker compose run --rm cognitive_fabric-dev cognitive-fabric info /app/data/memory.db
+docker compose run --rm cognitive_fabric-dev cognitive-fabric optimize /app/data/memory.db my-app --dry-run
 ```
 
 ## Scripting Examples
@@ -384,7 +421,7 @@ REPOS=("app1" "app2" "app3")
 
 for repo in "${REPOS[@]}"; do
     echo "Optimizing $repo..."
-    cognitive_fabric optimize "$DB_PATH" "$repo" --strategy balanced
+    cognitive-fabric optimize "$DB_PATH" "$repo" --strategy balanced
 done
 ```
 
@@ -396,7 +433,7 @@ done
 
 DB_PATH="/data/cognitive_fabric/memory.db"
 
-if cognitive_fabric info "$DB_PATH" > /dev/null 2>&1; then
+if cognitive-fabric info "$DB_PATH" > /dev/null 2>&1; then
     echo "Database healthy"
     exit 0
 else
@@ -414,5 +451,5 @@ fi
 DB_PATH="/data/cognitive_fabric/memory.db"
 REPO="my-app"
 
-cognitive_fabric list-snapshots "$DB_PATH" "$REPO" --json > snapshots.json
+cognitive-fabric list-snapshots "$DB_PATH" "$REPO" --json > snapshots.json
 ```

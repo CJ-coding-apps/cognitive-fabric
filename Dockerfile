@@ -42,9 +42,13 @@ USER cognitive_fabric
 VOLUME ["/app/data"]
 
 # Default environment variables
+# COGNITIVE_FABRIC_LOG_JSON, not a *_LOG_FORMAT name: the latter is not a field of
+# Settings, so pydantic-settings ignored it and the image logged by the setting's
+# own default rather than as this file claimed. The name is derived from the
+# field, so there is no alias to add.
 ENV COGNITIVE_FABRIC_DB_PATH=/app/data/cognitive_fabric.db \
     COGNITIVE_FABRIC_LOG_LEVEL=INFO \
-    COGNITIVE_FABRIC_LOG_FORMAT=json
+    COGNITIVE_FABRIC_LOG_JSON=true
 
 # Entry point for the MCP server
 CMD ["python", "-m", "cognitive_fabric.main"]
