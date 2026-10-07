@@ -55,28 +55,6 @@ COGNITIVE_FABRIC_OPENAI_MODEL=<model id from https://platform.openai.com/docs/mo
 
 ## Configuration File
 
-You can also use a `config.toml` file for configuration:
-
-```toml
-# config.toml
-[database]
-path = "./data/cognitive_fabric.db"
-
-[logging]
-level = "INFO"
-format = "json"
-
-[llm]
-provider = "openai"
-# Required, with no default; the id here is a placeholder, not a recommendation.
-model = "<model id from https://platform.openai.com/docs/models>"
-
-[optimizer]
-default_strategy = "balanced"
-max_deletions = 50
-stale_days_threshold = 90
-```
-
 ## CLI Configuration
 
 The CLI supports configuration through command-line options:
@@ -125,8 +103,6 @@ services:
     volumes:
       # Persist database
       - cognitive_fabric-data:/app/data
-      # Custom config file
-      - ./config.toml:/app/config.toml:ro
 
 volumes:
   cognitive_fabric-data:
@@ -247,20 +223,9 @@ COGNITIVE_FABRIC_DB_PATH=/data/project2.db cognitive_fabric serve
 
 ### Custom Strategy Configuration
 
-Via environment:
 ```bash
 COGNITIVE_FABRIC_OPTIMIZER_MAX_DELETIONS=30
 COGNITIVE_FABRIC_OPTIMIZER_STALE_DAYS=60
-```
-
-Via config file:
-```toml
-[optimizer]
-default_strategy = "balanced"
-max_deletions = 30
-stale_days_threshold = 60
-require_confirmation = true
-preserve_recent_days = 14
 ```
 
 ## Security Configuration
@@ -296,17 +261,6 @@ secrets:
 ```
 
 ## Performance Tuning
-
-### Connection Settings
-
-```toml
-[database]
-# Connection pool size (for future use)
-pool_size = 5
-
-# Query timeout in seconds
-query_timeout = 30
-```
 
 ### Memory Settings
 
