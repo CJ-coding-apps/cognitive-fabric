@@ -89,12 +89,12 @@ cloud = [
 # Do not lift it by widening this line; lift it by migrating to `list_tables()`
 # and re-running the vector-store tests.
 vectordb = [
-    "lancedb>=0.6.0,<0.26",
+    "lancedb>=0.6.0,<0.40",
 ]
 # Recommended local semantic layer: LanceDB + fastembed (pure-ONNX embeddings,
 # no torch — works on every Python this package supports).
 semantic = [
-    "lancedb>=0.6.0,<0.26",
+    "lancedb>=0.6.0,<0.40",
     "fastembed>=0.4.0",
 ]
 # Optional heavier alternative: local embeddings via sentence-transformers
@@ -107,7 +107,7 @@ semantic = [
 # that setting with no supported install route. Treat any defect found in this
 # path as a defect in untested code.
 semantic-st = [
-    "lancedb>=0.6.0,<0.26",
+    "lancedb>=0.6.0,<0.40",
     "sentence-transformers>=2.6.0",
 ]
 
