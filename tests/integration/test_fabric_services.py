@@ -153,6 +153,42 @@ class TestDataFabricService:
 
 
 @pytest.mark.integration
+class TestTheDegradedSemanticPath:
+    """What the install without the ``[semantic]`` extra promises, asserted.
+
+    CI installs this repo twice: once minimally, once with every extra. The
+    minimal profile's claim is not "the vector-store tests skipped" -- that is
+    just a green run in which four tests did nothing. It is that semantic search
+    reports itself unavailable instead of raising, so a caller can degrade. That
+    claim needs a test which runs only when the extra really is missing; it is
+    skipped here otherwise, which is the mirror image of
+    ``test_vector_store.py``'s module-level skip.
+    """
+
+    @pytest.mark.asyncio
+    async def test_semantic_search_reports_itself_unavailable(
+        self, memory_service: MemoryService
+    ):
+        try:
+            import lancedb  # noqa: F401
+        except ImportError:
+            pass
+        else:
+            pytest.skip("the [semantic] extra is installed; the full profile")
+
+        container = await memory_service.get_service_container()
+        svc = await container.get_data_fabric_service()
+
+        # No injected store: the service builds the real one, which cannot be
+        # built without lancedb. It must land in the except, not escape.
+        resp = await svc.semantic_search(REPO, BRANCH, "anything")
+
+        assert resp["available"] is False, resp
+        assert resp["results"] == [], resp
+        assert "unavailable" in resp["message"].lower(), resp
+
+
+@pytest.mark.integration
 class TestRealIngestion:
     @pytest.mark.asyncio
     async def test_real_tree_sitter_ingest(
