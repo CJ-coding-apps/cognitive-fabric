@@ -707,14 +707,6 @@ MEMORY_OPTIMIZER_TOOL = McpTool.create(
             "description": "Optimization strategy",
             "default": "balanced",
         },
-        "llmProvider": {
-            "type": "string",
-            "enum": ["openai", "anthropic"],
-            "description": (
-                "TS wire: LLM provider for enhanced analysis (degrades "
-                "gracefully without a live key)"
-            ),
-        },
         "dryRun": {
             "type": "boolean",
             "description": (
