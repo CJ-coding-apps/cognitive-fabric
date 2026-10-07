@@ -62,6 +62,33 @@ class _FakeAnthropicClient:
         return self._Messages(self._payload, self.requests)
 
 
+class _FakeOpenAIClient:
+    """Duck-typed openai-style client (has `.chat`, not `.messages`)."""
+
+    def __init__(self, payload: str):
+        self._payload = payload
+        self.requests: list[dict] = []
+
+    class _Completions:
+        def __init__(self, payload, requests):
+            self._payload = payload
+            self._requests = requests
+
+        def create(self, **kwargs):
+            self._requests.append(kwargs)
+            message = type("Message", (), {"content": self._payload})()
+            choice = type("Choice", (), {"message": message})()
+            return type("Resp", (), {"choices": [choice]})()
+
+    class _Chat:
+        def __init__(self, payload, requests):
+            self.completions = _FakeOpenAIClient._Completions(payload, requests)
+
+    @property
+    def chat(self):
+        return self._Chat(self._payload, self.requests)
+
+
 @pytest.mark.integration
 class TestDataFabricService:
     @pytest.mark.asyncio
@@ -231,3 +258,41 @@ class TestDreamService:
             {"r": REPO},
         )
         assert rows[0]["n"] == 1
+
+    @pytest.mark.asyncio
+    async def test_the_openai_request_carries_no_temperature(
+        self, memory_service: MemoryService, monkeypatch
+    ):
+        """The OpenAI branch sends exactly the model and the messages.
+
+        It used to send `temperature=0.2` on every call, and a reasoning model
+        rejects any temperature but its own with "unsupported value" -- so
+        distillation raised for everyone who had configured one. Asserting on
+        the whole request rather than on the one absent key is deliberate: a
+        parameter nobody chose is the defect, whichever its name.
+        """
+        monkeypatch.setattr(fabric_config.settings, "llm_provider", "openai")
+        monkeypatch.setattr(
+            fabric_config.settings, "openai_model", "an-example-model"
+        )
+
+        ctx = await memory_service.context
+        await ctx.update_context(
+            REPO,
+            ContextInput(
+                id="c1", name="c1", iso_date="2024-01-15",
+                summary="added foo", observation="foo does x",
+            ),
+        )
+
+        fake_llm = _FakeOpenAIClient(json.dumps({"decisions": []}))
+
+        container = await memory_service.get_service_container()
+        dream = await container.get_dream_service()
+        result = await dream.trigger_dream(REPO, BRANCH, llm_client=fake_llm)
+
+        assert result["status"] == "success"
+        assert len(fake_llm.requests) == 1
+        sent = fake_llm.requests[0]
+        assert set(sent) == {"model", "messages"}
+        assert sent["model"] == "an-example-model"
