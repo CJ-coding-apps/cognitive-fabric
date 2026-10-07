@@ -61,19 +61,36 @@ cloud = [
 ]
 # Vector store only (LanceDB). Enough for semantic search with an injected
 # embedder; the OpenAI embedding backend additionally needs the `cloud` extra.
+#
+# Capped below 0.26, which resolves to 0.25.3 — the version this code is tested
+# against, and the same cap docugraph carries. Two reasons, either sufficient:
+#
+#   * `VectorStore` calls `table_names()`, and lancedb >= 0.30 deprecates it in
+#     favour of `list_tables()`. That is not a rename -- the replacement returns
+#     a paginated response rather than an iterable of names -- so it is a
+#     migration. `filterwarnings` below turns a deprecation raised through our
+#     own frame into an error, which is how this surfaced: with an unbounded
+#     range CI installed an API this code has never run against, and went red
+#     the first time those vector-store tests actually ran.
+#   * 0.26 dropped the macOS x86_64 wheels.
+#
+# So the ceiling is what makes the declared range honest. Lifting it is a
+# Dependabot PR a person reviews, the same shape as the `cloud` caps above.
+# Do not lift it by widening this line; lift it by migrating to `list_tables()`
+# and re-running the vector-store tests.
 vectordb = [
-    "lancedb>=0.6.0",
+    "lancedb>=0.6.0,<0.26",
 ]
 # Recommended local semantic layer: LanceDB + fastembed (pure-ONNX embeddings,
 # no torch — works everywhere, including Python 3.13).
 semantic = [
-    "lancedb>=0.6.0",
+    "lancedb>=0.6.0,<0.26",
     "fastembed>=0.4.0",
 ]
 # Optional heavier alternative: local embeddings via sentence-transformers
 # (requires torch, which has no wheel for some Python versions).
 semantic-st = [
-    "lancedb>=0.6.0",
+    "lancedb>=0.6.0,<0.26",
     "sentence-transformers>=2.6.0",
 ]
 
