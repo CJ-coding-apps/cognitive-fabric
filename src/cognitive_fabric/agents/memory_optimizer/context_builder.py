@@ -39,10 +39,31 @@ STRATEGY_CONFIGS: Dict[str, Dict[str, Any]] = {
     },
 }
 
-# What an unrecognised strategy name falls back to. Not "aggressive": this
-# package deletes memory, so an unreadable or hallucinated strategy must not be
-# the one that removes the most.
-DEFAULT_STRATEGY = "balanced"
+
+def strategy_config(strategy: str) -> Dict[str, Any]:
+    """The preset for ``strategy``.
+
+    Args:
+        strategy: The strategy name -- one of the keys of ``STRATEGY_CONFIGS``.
+
+    Returns:
+        That strategy's preset.
+
+    Raises:
+        ValueError: If the name is not one of the presets. An unrecognised name
+            used to resolve to ``balanced``, which is the wrong answer to "I do
+            not understand you" from a caller that is about to delete memory,
+            and a silent one: the run went ahead under a strategy nobody chose.
+            Same shape as an unrecognised role name resolving to the
+            most-privileged one.
+    """
+    try:
+        return STRATEGY_CONFIGS[strategy]
+    except KeyError:
+        known = ", ".join(sorted(STRATEGY_CONFIGS))
+        raise ValueError(
+            f"Unknown optimization strategy {strategy!r}; expected one of: {known}"
+        ) from None
 
 
 def effective_max_deletions(
@@ -67,15 +88,14 @@ def effective_max_deletions(
     would let a high cap override a conservative strategy. Neither is a cap.
 
     Args:
-        strategy: The strategy name; unknown names use the default preset.
+        strategy: The strategy name; an unrecognised one is an error.
         requested: The caller's requested limit, if any.
         operator_cap: The operator's configured limit, if any.
 
     Returns:
         The lowest applicable limit.
     """
-    config = STRATEGY_CONFIGS.get(strategy, STRATEGY_CONFIGS[DEFAULT_STRATEGY])
-    ceilings = [config["max_deletions"]]
+    ceilings = [strategy_config(strategy)["max_deletions"]]
     ceilings.extend(c for c in (operator_cap, requested) if c is not None)
     return min(int(c) for c in ceilings)
 
@@ -246,19 +266,8 @@ class MemoryContextBuilder:
                 "components": candidates,
                 "orphaned_tags": orphaned_tags,
             },
-            "strategy_config": self._get_strategy_config(strategy),
+            "strategy_config": strategy_config(strategy),
         }
-
-    def _get_strategy_config(self, strategy: str) -> Dict[str, Any]:
-        """Get configuration for the optimization strategy.
-
-        Args:
-            strategy: The strategy name.
-
-        Returns:
-            Strategy configuration.
-        """
-        return STRATEGY_CONFIGS.get(strategy, STRATEGY_CONFIGS[DEFAULT_STRATEGY])
 
     async def get_component_details(
         self,

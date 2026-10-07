@@ -219,10 +219,10 @@ COGNITIVE_FABRIC_DB_PATH=/data/project2.db cognitive-fabric serve
 | Strategy | Stale threshold (days) | Max deletions | Deletes orphaned tags | Requires no dependents |
 |----------|------------------------|---------------|-----------------------|-----------------------|
 | conservative | 90 | 10 | no | yes |
-| **balanced** (default on an unrecognised strategy name) | 60 | 50 | yes | no |
+| balanced | 60 | 50 | yes | no |
 | aggressive | 30 | 100 | yes | no |
 
-The strategy that applies when none is requested is `COGNITIVE_FABRIC_OPTIMIZER_DEFAULT_STRATEGY`, which is `conservative`.
+The strategy that applies when none is requested is `COGNITIVE_FABRIC_OPTIMIZER_DEFAULT_STRATEGY`, which is `conservative`. A name that is none of these three is refused, not resolved to one of them.
 <!-- END GENERATED: strategy table -->
 
 ### Capping how much one run may delete

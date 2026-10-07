@@ -292,7 +292,9 @@ class TestAFailedSnapshot:
             raise RuntimeError("CHECKPOINT left the write-ahead log in place")
 
         monkeypatch.setattr(SnapshotService, "_checkpoint", _checkpoint_fails)
-        monkeypatch.setattr(cf_settings, "optimizer_snapshot_failure_policy", "continue")
+        monkeypatch.setattr(
+            cf_settings, "optimizer_snapshot_failure_policy", "continue"
+        )
 
         client = await memory_service.get_kuzu_client()
         before = await _count_components(client)

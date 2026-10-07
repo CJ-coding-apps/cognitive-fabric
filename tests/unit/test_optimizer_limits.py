@@ -13,7 +13,6 @@ operator's cap overriding a conservative strategy, or an absent request meaning
 import pytest
 
 from cognitive_fabric.agents.memory_optimizer.context_builder import (
-    DEFAULT_STRATEGY,
     STRATEGY_CONFIGS,
     effective_max_deletions,
 )
@@ -32,16 +31,17 @@ class TestStrategyPresets:
         }
         assert limits["conservative"] < limits["balanced"] < limits["aggressive"]
 
-    def test_an_unknown_strategy_does_not_get_the_boldest_preset(self):
-        """A hallucinated strategy name must not be the one that deletes most.
+    def test_an_unknown_strategy_is_refused_not_defaulted(self):
+        """A name that is not a preset is an error, not the default preset.
 
-        The limit that applies to an unrecognised name is the default's, and the
-        default is not `aggressive`.
+        It used to resolve to `balanced`, which is the wrong answer to "I do not
+        understand you" from a caller that is about to delete memory -- and a
+        silent one: the run went ahead under a strategy nobody chose, and
+        reported success. The same shape as an unrecognised role name resolving
+        to the most-privileged one.
         """
-        assert DEFAULT_STRATEGY != "aggressive"
-        assert effective_max_deletions("no-such-strategy") == (
-            STRATEGY_CONFIGS[DEFAULT_STRATEGY]["max_deletions"]
-        )
+        with pytest.raises(ValueError, match="Unknown optimization strategy"):
+            effective_max_deletions("no-such-strategy")
 
 
 class TestTheLowestCeilingWins:

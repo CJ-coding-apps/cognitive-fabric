@@ -40,10 +40,7 @@ from pathlib import Path
 import jsonschema
 import pytest
 
-from cognitive_fabric.agents.memory_optimizer.context_builder import (
-    DEFAULT_STRATEGY,
-    STRATEGY_CONFIGS,
-)
+from cognitive_fabric.agents.memory_optimizer.context_builder import STRATEGY_CONFIGS
 from cognitive_fabric.cli.main import cli as cli_group
 from cognitive_fabric.config import Settings
 from cognitive_fabric.mcp.tool_registry import ToolRegistry
@@ -99,11 +96,8 @@ def render_strategy_table() -> str:
             True: "yes",
             False: "no",
         }
-        label = f"**{name}**" if name == DEFAULT_STRATEGY else name
-        if name == DEFAULT_STRATEGY:
-            label += " (default on an unrecognised strategy name)"
         rows.append(
-            f"| {label} | {config['stale_days_threshold']} | "
+            f"| {name} | {config['stale_days_threshold']} | "
             f"{config['max_deletions']} | "
             f"{marks[bool(config['delete_orphaned_tags'])]} | "
             f"{marks[bool(config['require_no_dependents'])]} |"
@@ -112,7 +106,8 @@ def render_strategy_table() -> str:
     rows.append(
         "The strategy that applies when none is requested is "
         "`COGNITIVE_FABRIC_OPTIMIZER_DEFAULT_STRATEGY`, which is "
-        "`conservative`."
+        "`conservative`. A name that is none of these three is refused, not "
+        "resolved to one of them."
     )
     return "\n".join(rows)
 

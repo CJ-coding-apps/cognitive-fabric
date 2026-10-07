@@ -412,3 +412,72 @@ class TestOperatorDeletionCap:
             },
         )
         assert result.get("max_deletions") == 2
+
+
+@pytest.mark.integration
+class TestAnUnknownStrategyName:
+    """The schema's enum is documentation; the handler is what refuses.
+
+    `mcp/server.py` passes tool arguments straight to the handler, so a name
+    the schema does not list still arrives. It used to resolve to `balanced` and
+    delete up to fifty entities under a strategy nobody asked for.
+    """
+
+    @pytest_asyncio.fixture
+    async def call(self, memory_service: MemoryService):
+        registry = ToolRegistry()
+        ctx = ToolHandlerContext()
+
+        async def _call(name, params):
+            return await registry.call_tool(name, params, ctx, memory_service)
+
+        return _call
+
+    @pytest.mark.asyncio
+    async def test_it_is_refused_before_anything_is_deleted(
+        self, call, memory_service: MemoryService, temp_dir: Path
+    ):
+        await call(
+            "memory-bank",
+            {
+                "operation": "init",
+                "repository": REPO,
+                "branch": BRANCH,
+                "clientProjectRoot": str(temp_dir),
+            },
+        )
+        for i in range(3):
+            await call(
+                "entity",
+                {
+                    "operation": "create",
+                    "entityType": "component",
+                    "repository": REPO,
+                    "branch": BRANCH,
+                    "data": {
+                        "id": f"typo-comp-{i}",
+                        "name": f"TypoComp{i}",
+                        "kind": "service",
+                        "status": "deprecated",
+                    },
+                },
+            )
+
+        client = await memory_service.get_kuzu_client()
+        before = client.count("MATCH (c:Component) RETURN count(c)")
+
+        result = await call(
+            "memory-optimizer",
+            {
+                "operation": "optimize",
+                "repository": REPO,
+                "branch": BRANCH,
+                "dryRun": False,
+                "confirm": True,
+                "strategy": "louvain-typo",
+            },
+        )
+
+        assert result.get("success") is False, result
+        assert "louvain-typo" in result.get("error", ""), result
+        assert client.count("MATCH (c:Component) RETURN count(c)") == before
