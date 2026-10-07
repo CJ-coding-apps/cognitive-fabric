@@ -474,7 +474,7 @@ class TagRepository(BaseRepository):
                t.name AS name,
                t.category AS category,
                count(item) AS usage_count
-        ORDER BY usage_count DESC, t.name
+        ORDER BY usage_count DESC, name
         """
 
         rows = self.fetch_all(query, {"repository": repository, "branch": branch})
