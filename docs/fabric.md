@@ -34,7 +34,9 @@ repository/branch).
 - **`VectorStore`** (`fabric/vector_store.py`) — a LanceDB table of symbol
   embeddings. Embedding backend preference: OpenAI (if `OPENAI_API_KEY` is set) →
   **fastembed** (local, pure-ONNX, **no torch** — the default) →
-  sentence-transformers (optional). A custom embedder can also be injected.
+  sentence-transformers (optional, `[semantic-st]`; no CI job installs it, so it
+  is the one backend without a test behind it). A custom embedder can also be
+  injected.
   LanceDB is used instead of KuzuDB's (immutable) vector index. Install with
   `pip install -e '.[semantic]'`.
 - **`DataFabricService`** (`services/domain/data_fabric.py`) —

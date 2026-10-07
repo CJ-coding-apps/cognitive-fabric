@@ -9,8 +9,10 @@ This is the single-runtime successor to the split TypeScript-core + Python-sidec
 design: there is **no Arrow Flight sidecar and no network data-plane port** — the
 tree-sitter, embedding, and LLM work all run in-process.
 
-> **Provenance:** derived from and extends the Apache-2.0 project
-> [KuzuMem-MCP](https://github.com/Jakedismo/KuzuMem-MCP) (via its Python port).
+> **Provenance:** the memory-bank core's tool surface and data model follow the
+> Apache-2.0 project [KuzuMem-MCP](https://github.com/Jakedismo/KuzuMem-MCP); the
+> Python implementation — this repository, and the author's own unpublished
+> KuzuMemPy-MCP port it grew from — was written by this project's author.
 > See `NOTICE`. Licensed under Apache-2.0 (`LICENSE`).
 
 ## Features
@@ -34,31 +36,35 @@ tree-sitter, embedding, and LLM work all run in-process.
 
 ## Installation
 
-Requires Python 3.11+.
+Requires Python 3.11–3.13. CI runs the suite on all three, on Linux. Python 3.14
+is excluded deliberately: `kuzu` 0.11.3 — the final release, and the version this
+package pins — ships no 3.14 wheels for macOS or Windows, so on those platforms
+pip would try to build Kùzu's C++ from source.
 
 ```bash
-# Clone this repository, then from the repository root:
-python -m venv .venv && source .venv/bin/activate
-
 # Base install (memory bank + fabric ingestion via tree-sitter)
-pip install -e .
+pip install cognitive-fabric
 
 # Semantic search: LanceDB + fastembed local embeddings (pure ONNX, no torch —
-# works everywhere, incl. Python 3.13)
-pip install -e '.[semantic]'
+# works on every Python this package supports)
+pip install 'cognitive-fabric[semantic]'
 
 # Or just the vector store (LanceDB), for an injected embedder
-pip install -e '.[vectordb]'
+pip install 'cognitive-fabric[vectordb]'
 
 # Talking to a hosted provider: the OpenAI and Anthropic SDKs. Needed by the
 # dream engine / memory optimizer, and by the OpenAI embedding backend. Not
 # installed by default — a local-first install should not download two vendor
 # SDKs it never calls.
-pip install -e '.[cloud]'
+pip install 'cognitive-fabric[cloud]'
 
 # Dev tools
-pip install -e '.[dev]'
+pip install 'cognitive-fabric[dev]'
 ```
+
+To work from a checkout instead, clone this repository, create a virtualenv, and
+use `.` in place of the package name: `pip install -e .`,
+`pip install -e '.[semantic]'`, and so on.
 
 ### KuzuDB version
 
@@ -84,29 +90,44 @@ cognitive-fabric query ./data/mem.db "MATCH (s:Symbol) RETURN s.id LIMIT 10"
 
 ## Running as an MCP server
 
+The server is a console script, so where it lives depends on how you installed
+the package. For an MCP client, an isolated tool install is the least fuss: it
+puts the script somewhere stable that does not move with a project directory.
+
 ```bash
-cognitive-fabric serve --db-path ./data/mem.db   # stdio transport
+pipx install cognitive-fabric      # or: uv tool install cognitive-fabric
 ```
 
-Register in your MCP client (e.g. Claude Code):
+Then ask your shell where it landed:
+
+```bash
+which cognitive-fabric      # macOS, Linux
+where cognitive-fabric      # Windows
+```
+
+and put the path it prints in your MCP client (e.g. Claude Code), in place of
+the placeholder below:
 
 ```json
 {
   "mcpServers": {
     "cognitive-fabric": {
-      "command": "/absolute/path/to/cognitive-fabric/.venv/bin/cognitive-fabric",
+      "command": "/absolute/path/to/bin/cognitive-fabric",
       "args": ["serve", "--db-path", "/absolute/path/to/mem.db"]
     }
   }
 }
 ```
 
-Both paths must be absolute. An MCP client launches the server itself rather
-than through a shell, so it does not inherit the virtualenv you activated — a
-bare `"command": "cognitive-fabric"` fails with `No such file or directory`
-unless that directory happens to be on the client's `PATH`. `pip install -e .`
-puts the script at `.venv/bin/cognitive-fabric` inside the repository
-(`Scripts\cognitive-fabric.exe` on Windows).
+An MCP client launches the server itself rather than through a shell, so it
+does not inherit your `PATH` — a bare `"command": "cognitive-fabric"` fails
+with `No such file or directory` even when that directory is on it. That is why
+the path is spelled out. `--db-path` must be absolute too, and on Windows the
+script is `cognitive-fabric.exe`.
+
+From a checkout, `pip install -e .` puts the script at
+`.venv/bin/cognitive-fabric` (`Scripts\cognitive-fabric.exe` on Windows), and
+that is the path to give the client.
 
 ## MCP tools
 
@@ -149,11 +170,13 @@ Settings load from environment (prefix `COGNITIVE_FABRIC_`) or a `.env` file
 
 - `COGNITIVE_FABRIC_LLM_PROVIDER` (`openai` | `anthropic`) + `OPENAI_API_KEY` /
   `ANTHROPIC_API_KEY` — enables the dream engine. Both the provider SDKs come
-  from the `[cloud]` extra (`pip install -e '.[cloud]'`); without it the dream
-  engine reports that the SDK is missing rather than raising an import error.
+  from the `[cloud]` extra (`pip install 'cognitive-fabric[cloud]'`); without it
+  the dream engine reports that the SDK is missing rather than raising an import
+  error.
 - `COGNITIVE_FABRIC_FABRIC_DATA_DIR` — where the LanceDB vector store lives.
 - `COGNITIVE_FABRIC_FABRIC_EMBEDDING_PROVIDER` (`sentence-transformers` |
-  `openai`).
+  `openai`). The `sentence-transformers` backend needs the `[semantic-st]` extra;
+  it is the one embedding backend no CI job installs, so it has no test behind it.
 
 ## Development
 
@@ -187,7 +210,8 @@ MCP client (stdio)
 
 Everything runs in one Python process over stdio; the fabric ML runs in-process
 (no sidecar, no network data plane). See
-[docs/architecture.md](docs/architecture.md) and [docs/fabric.md](docs/fabric.md).
+[docs/architecture.md](https://github.com/CJ-coding-apps/cognitive-fabric/blob/main/docs/architecture.md)
+and [docs/fabric.md](https://github.com/CJ-coding-apps/cognitive-fabric/blob/main/docs/fabric.md).
 
 ## Project structure
 

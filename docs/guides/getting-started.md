@@ -5,7 +5,7 @@ This guide will help you get Cognitive-Fabric up and running quickly.
 ## Prerequisites
 
 - Docker and Docker Compose (recommended)
-- OR Python 3.11+ for local installation
+- OR Python 3.11–3.13 for local installation
 
 ## Quick Start with Docker
 
