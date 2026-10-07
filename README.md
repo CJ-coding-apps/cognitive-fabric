@@ -9,8 +9,10 @@ This is the single-runtime successor to the split TypeScript-core + Python-sidec
 design: there is **no Arrow Flight sidecar and no network data-plane port** — the
 tree-sitter, embedding, and LLM work all run in-process.
 
-> **Provenance:** derived from and extends the Apache-2.0 project
-> [KuzuMem-MCP](https://github.com/Jakedismo/KuzuMem-MCP) (via its Python port).
+> **Provenance:** the memory-bank core's tool surface and data model follow the
+> Apache-2.0 project [KuzuMem-MCP](https://github.com/Jakedismo/KuzuMem-MCP); the
+> Python implementation — this repository, and the author's own unpublished
+> KuzuMemPy-MCP port it grew from — was written by this project's author.
 > See `NOTICE`. Licensed under Apache-2.0 (`LICENSE`).
 
 ## Features
