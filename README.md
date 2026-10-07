@@ -90,29 +90,44 @@ cognitive-fabric query ./data/mem.db "MATCH (s:Symbol) RETURN s.id LIMIT 10"
 
 ## Running as an MCP server
 
+The server is a console script, so where it lives depends on how you installed
+the package. For an MCP client, an isolated tool install is the least fuss: it
+puts the script somewhere stable that does not move with a project directory.
+
 ```bash
-cognitive-fabric serve --db-path ./data/mem.db   # stdio transport
+pipx install cognitive-fabric      # or: uv tool install cognitive-fabric
 ```
 
-Register in your MCP client (e.g. Claude Code):
+Then ask your shell where it landed:
+
+```bash
+which cognitive-fabric      # macOS, Linux
+where cognitive-fabric      # Windows
+```
+
+and put the path it prints in your MCP client (e.g. Claude Code), in place of
+the placeholder below:
 
 ```json
 {
   "mcpServers": {
     "cognitive-fabric": {
-      "command": "/absolute/path/to/cognitive-fabric/.venv/bin/cognitive-fabric",
+      "command": "/absolute/path/to/bin/cognitive-fabric",
       "args": ["serve", "--db-path", "/absolute/path/to/mem.db"]
     }
   }
 }
 ```
 
-Both paths must be absolute. An MCP client launches the server itself rather
-than through a shell, so it does not inherit the virtualenv you activated — a
-bare `"command": "cognitive-fabric"` fails with `No such file or directory`
-unless that directory happens to be on the client's `PATH`. `pip install -e .`
-puts the script at `.venv/bin/cognitive-fabric` inside the repository
-(`Scripts\cognitive-fabric.exe` on Windows).
+An MCP client launches the server itself rather than through a shell, so it
+does not inherit your `PATH` — a bare `"command": "cognitive-fabric"` fails
+with `No such file or directory` even when that directory is on it. That is why
+the path is spelled out. `--db-path` must be absolute too, and on Windows the
+script is `cognitive-fabric.exe`.
+
+From a checkout, `pip install -e .` puts the script at
+`.venv/bin/cognitive-fabric` (`Scripts\cognitive-fabric.exe` on Windows), and
+that is the path to give the client.
 
 ## MCP tools
 
