@@ -642,7 +642,6 @@ ADVERTISED_DEFAULTS = {
     "strategy": "optimizer_default_strategy",
     "enableMCPSampling": "optimizer_enable_mcp_sampling",
     "samplingStrategy": "optimizer_default_sampling_strategy",
-    "snapshotFailurePolicy": "optimizer_snapshot_failure_policy",
 }
 
 

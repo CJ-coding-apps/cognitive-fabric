@@ -290,6 +290,19 @@ cognitive-fabric optimize /path/to/db my-repo --strategy conservative
 3. Monitor for issues after optimization
 4. Keep recent snapshots for quick rollback
 
+### The pre-deletion snapshot
+
+Every run that is not a dry run copies the database in full before it touches
+anything, and the snapshot id is reported so the run can be undone with
+`rollback`. If that copy cannot be taken the default is to **abort**: nothing
+is deleted and the error says why.
+
+`COGNITIVE_FABRIC_OPTIMIZER_SNAPSHOT_FAILURE_POLICY` is a deployment setting
+and deliberately not a tool argument. An agent that is about to delete memory
+must not be able to waive the backup that makes the deletion reversible; the
+opt-out belongs to the operator, who can set it to `warn` or `continue` and
+accept an irreversible run.
+
 ## Troubleshooting
 
 ### High Number of Issues
@@ -353,8 +366,7 @@ agent API, not on the wire.
   "maxDeletions": "integer (optional, can only lower the effective cap)",
   "focusAreas": ["stale-detection", "redundancy-removal", "relationship-cleanup", "dependency-optimization", "tag-consolidation", "orphan-removal"],
   "preserveCategories": ["string"],
-  "analysisId": "string (optional, reuses a cached analyze result)",
-  "snapshotFailurePolicy": "abort | continue | warn"
+  "analysisId": "string (optional, reuses a cached analyze result)"
 }
 ```
 

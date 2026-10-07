@@ -781,15 +781,6 @@ MEMORY_OPTIMIZER_TOOL = McpTool.create(
             "description": "TS wire: memory sampling strategy",
             "default": settings.optimizer_default_sampling_strategy,
         },
-        "snapshotFailurePolicy": {
-            "type": "string",
-            "enum": ["abort", "continue", "warn"],
-            "description": (
-                "TS wire: behavior when pre-optimization snapshot creation "
-                "fails"
-            ),
-            "default": settings.optimizer_snapshot_failure_policy,
-        },
         "description": {
             "type": "string",
             "description": "Description for create-snapshot operation",

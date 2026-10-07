@@ -234,9 +234,10 @@ async def _handle_optimize(
     focus_areas = params.get("focusAreas") or []
     preserve_categories = params.get("preserveCategories") or []
     analysis_id = params.get("analysisId")
-    snapshot_failure_policy = params.get(
-        "snapshotFailurePolicy", settings.optimizer_snapshot_failure_policy
-    )
+    # The response names the policy in force, but the policy itself is not a
+    # tool argument: an opt-out the deleting agent can fill in itself is not the
+    # operator's opt-out. It is a deployment setting.
+    snapshot_failure_policy = settings.optimizer_snapshot_failure_policy
 
     warnings: List[str] = []
 
@@ -289,7 +290,12 @@ async def _handle_optimize(
                 return {
                     "success": False,
                     "operation": "optimize",
-                    "error": f"Snapshot creation failed: {exc}",
+                    "error": (
+                        f"Snapshot creation failed, so nothing was deleted: {exc}. "
+                        "To delete without a backup, set "
+                        "COGNITIVE_FABRIC_OPTIMIZER_SNAPSHOT_FAILURE_POLICY to "
+                        "'warn' or 'continue'."
+                    ),
                     "snapshotFailurePolicy": snapshot_failure_policy,
                 }
             elif snapshot_failure_policy == "warn":

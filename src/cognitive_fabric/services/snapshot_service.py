@@ -1,4 +1,13 @@
-"""Snapshot service for creating and managing database snapshots."""
+"""Snapshot service for creating and managing database snapshots.
+
+KuzuDB >= 0.11 stores a database as a single *file* plus a sibling
+write-ahead log, ``<path>.wal``, and every write since the last checkpoint
+lives in the log rather than in the file. So a backup of a KuzuDB database is
+only a backup when it is taken after a ``CHECKPOINT``, and a restore is only a
+restore when the log that is already on disk is removed first -- otherwise the
+stale log replays over the restored file and the database silently reports its
+pre-restore state.
+"""
 
 import json
 import shutil
@@ -11,9 +20,42 @@ import structlog
 from cognitive_fabric.types.optimization import SnapshotInfo
 
 if TYPE_CHECKING:
-    from cognitive_fabric.services.service_container import ServiceContainer
+    from cognitive_fabric.db.kuzu_client import KuzuDBClient
 
 logger = structlog.get_logger(__name__)
+
+
+def _wal_path(db_path: Path) -> Path:
+    """The write-ahead log KuzuDB keeps beside a database file."""
+    return db_path.with_name(db_path.name + ".wal")
+
+
+def _copy_database(src: Path, dst: Path) -> None:
+    """Copy a database exactly as it is on disk: a file, or a directory.
+
+    KuzuDB >= 0.11 makes the database a file, so the ``copytree`` this used to
+    call raised ``NotADirectoryError``; a directory is still possible for an
+    older graph, so branch on what is actually there instead of assuming.
+    """
+    if src.is_dir():
+        shutil.copytree(src, dst)
+    else:
+        shutil.copy2(src, dst)
+
+
+def _remove_database(path: Path) -> None:
+    """Remove a database and its write-ahead log, if present.
+
+    The log must go with the file: left behind, it is replayed on the next open
+    and overwrites what was just restored.
+    """
+    wal = _wal_path(path)
+    if wal.exists():
+        wal.unlink()
+    if path.is_dir():
+        shutil.rmtree(path)
+    elif path.exists():
+        path.unlink()
 
 
 class SnapshotService:
@@ -22,24 +64,37 @@ class SnapshotService:
     Snapshots allow rolling back to a previous state of the memory bank.
     """
 
-    def __init__(
-        self,
-        db_path: str,
-        container: "ServiceContainer",
-    ) -> None:
+    def __init__(self, client: "KuzuDBClient") -> None:
         """Initialize the snapshot service.
 
         Args:
-            db_path: Path to the KuzuDB database.
-            container: The service container.
+            client: The KuzuDB client. The database path comes from it, and it
+                is what makes the ``CHECKPOINT`` and the close/reopen around a
+                restore possible.
         """
-        self._db_path = Path(db_path)
-        self._container = container
+        self._client = client
+        self._db_path = Path(client.db_path)
         self._snapshots_dir = self._db_path.parent / "snapshots"
         self._manifest_path = self._snapshots_dir / "manifest.json"
 
         # Ensure snapshots directory exists
         self._snapshots_dir.mkdir(parents=True, exist_ok=True)
+
+    async def _checkpoint(self) -> None:
+        """Fold the write-ahead log into the database file.
+
+        Raises:
+            RuntimeError: If a log is still on disk afterwards, which would
+                mean a copy taken now is missing rows.
+        """
+        self._client.execute_query("CHECKPOINT")
+
+        wal = _wal_path(self._db_path)
+        if wal.exists():
+            raise RuntimeError(
+                f"CHECKPOINT left the write-ahead log in place at {wal}; a copy "
+                "taken now would not contain the writes it holds"
+            )
 
     def _load_manifest(self) -> dict[str, Any]:
         """Load the snapshots manifest.
@@ -95,9 +150,13 @@ class SnapshotService:
         )
 
         try:
-            # Copy the database directory
             if self._db_path.exists():
-                shutil.copytree(self._db_path, snapshot_path)
+                # Fold the log in first: without this the copy is a few-KB
+                # header and every row is still in the `.wal` beside it. There
+                # is no `await` between the checkpoint and the copy, so nothing
+                # writes in between and the log cannot come back.
+                await self._checkpoint()
+                _copy_database(self._db_path, snapshot_path)
             else:
                 logger.warning(
                     "Database path does not exist", db_path=str(self._db_path)
@@ -105,11 +164,12 @@ class SnapshotService:
                 snapshot_path.mkdir(parents=True, exist_ok=True)
 
             # Calculate size
-            size = sum(
-                f.stat().st_size
-                for f in snapshot_path.rglob("*")
-                if f.is_file()
-            )
+            if snapshot_path.is_dir():
+                size = sum(
+                    f.stat().st_size for f in snapshot_path.rglob("*") if f.is_file()
+                )
+            else:
+                size = snapshot_path.stat().st_size
 
             # Create snapshot info
             snapshot_info = SnapshotInfo(
@@ -143,7 +203,7 @@ class SnapshotService:
             )
             # Clean up partial snapshot
             if snapshot_path.exists():
-                shutil.rmtree(snapshot_path, ignore_errors=True)
+                _remove_database(snapshot_path)
             raise
 
     async def rollback_to_snapshot(
@@ -186,21 +246,31 @@ class SnapshotService:
         )
 
         try:
-            # Create a backup of current state before rollback
+            # Create a backup of current state before rollback. Checkpoint
+            # first, so the backup is the whole database and not a header.
+            if self._db_path.exists():
+                await self._checkpoint()
+
             _ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
             backup_id = f"pre_rollback_{_ts}"
             backup_path = self._snapshots_dir / backup_id
 
             if self._db_path.exists():
-                shutil.copytree(self._db_path, backup_path)
+                _copy_database(self._db_path, backup_path)
                 logger.info("Created pre-rollback backup", backup_id=backup_id)
 
-            # Remove current database
-            if self._db_path.exists():
-                shutil.rmtree(self._db_path)
+            # Close the connection: the database file cannot be swapped while a
+            # handle is open on it, and the log of the state we are leaving has
+            # to go with it.
+            await self._client.close()
 
-            # Restore from snapshot
-            shutil.copytree(snapshot_path, self._db_path)
+            _remove_database(self._db_path)
+            _copy_database(snapshot_path, self._db_path)
+
+            # Reopen. If the copy above failed we deliberately do not reopen:
+            # `initialize` would create an empty database at the missing path,
+            # which would turn a failed restore into a silent data loss.
+            await self._client.initialize()
 
             logger.info(
                 "Rollback complete",
@@ -302,7 +372,7 @@ class SnapshotService:
 
         try:
             if snapshot_path.exists():
-                shutil.rmtree(snapshot_path)
+                _remove_database(snapshot_path)
 
             self._save_manifest(manifest)
 

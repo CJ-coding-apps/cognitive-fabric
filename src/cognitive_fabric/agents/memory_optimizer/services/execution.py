@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional
 
 import structlog
 
+from cognitive_fabric.config import settings
 from cognitive_fabric.services.memory_service import MemoryService
 from cognitive_fabric.services.snapshot_service import SnapshotService
 from cognitive_fabric.types.optimization import (
@@ -69,15 +70,50 @@ class OptimizationExecutionService:
         # Create snapshot before execution (unless dry run)
         if create_snapshot and not dry_run:
             try:
-                snapshot_id = await self._snapshot_service.create_snapshot(
+                snapshot = await self._snapshot_service.create_snapshot(
                     plan.repository,
                     plan.branch,
                     f"Pre-optimization snapshot for plan {plan.id}",
                 )
+                # `create_snapshot` returns `SnapshotInfo`, not an id. Passing
+                # the object straight into `ExecutionResult.snapshot_id` (a
+                # `str`) raised a pydantic ValidationError -- after the
+                # deletions had already run.
+                snapshot_id = snapshot.id
                 logger.info("Created pre-execution snapshot", snapshot_id=snapshot_id)
             except Exception as e:
-                logger.error("Failed to create snapshot", error=str(e))
-                # Continue without snapshot if it fails
+                # The snapshot is what makes the deletions below reversible, so
+                # a snapshot that did not happen is a reason not to run at all.
+                # That is the default; "warn" and "continue" are the explicit
+                # opt-out for an operator who accepts an irreversible run.
+                failure_policy = settings.optimizer_snapshot_failure_policy
+                if failure_policy == "abort":
+                    logger.error("Snapshot creation failed; aborting", error=str(e))
+                    return ExecutionResult(
+                        plan_id=plan.id,
+                        repository=plan.repository,
+                        branch=plan.branch,
+                        dry_run=dry_run,
+                        error=(
+                            f"Snapshot creation failed, so nothing was deleted: "
+                            f"{e}. To delete without a backup, set "
+                            f"COGNITIVE_FABRIC_OPTIMIZER_SNAPSHOT_FAILURE_POLICY to "
+                            f"'warn' or 'continue'."
+                        ),
+                        summary={
+                            "total_actions": len(plan.actions),
+                            "executed": 0,
+                            "failed": 0,
+                            "skipped": len(plan.actions),
+                        },
+                    )
+                elif failure_policy == "warn":
+                    logger.warning("Snapshot creation failed; continuing", error=str(e))
+                else:  # continue silently
+                    logger.info(
+                        "Snapshot creation failed; continuing silently",
+                        error=str(e),
+                    )
 
         # Execute each action
         for action in plan.actions:

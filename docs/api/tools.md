@@ -803,7 +803,6 @@ Execute optimization with a strategy.
 | focusAreas | array | No | Restrict the plan to specific cleanup areas |
 | preserveCategories | array | No | Tag categories to keep regardless of the plan |
 | analysisId | string | No | Reuse a cached `analyze` result |
-| snapshotFailurePolicy | string | No | `"abort"`, `"continue"`, or `"warn"` (default: `"warn"`) |
 
 #### rollback
 

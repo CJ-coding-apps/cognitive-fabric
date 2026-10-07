@@ -207,13 +207,20 @@ class OptimizationResult(BaseModel):
 
 
 class SnapshotInfo(BaseModel):
-    """Information about a saved snapshot."""
+    """Information about a saved snapshot.
 
-    snapshot_id: str
+    `id` is the key the snapshot manifest, `rollback_to_snapshot` and
+    `list_snapshots` all look it up by; the field was `snapshot_id`, so every
+    `SnapshotInfo(...)` the service built raised a ValidationError for the
+    missing field and no snapshot was ever recorded.
+    """
+
+    id: str
     created_at: datetime
     repository: str
     branch: str
-    entity_counts: dict[str, int]
+    # None means this snapshot did not count entities, not that it holds none.
+    entity_counts: Optional[dict[str, int]] = None
     description: Optional[str] = None
     size_bytes: int
 
@@ -338,6 +345,10 @@ class ExecutionResult(BaseModel):
     branch: str
     snapshot_id: Optional[str] = None
     dry_run: bool
+    # Set when the run was stopped before executing anything -- today, only
+    # when the pre-deletion snapshot could not be taken and the configured
+    # policy is to abort. When it is set, no action ran.
+    error: Optional[str] = None
     executed: list[dict[str, Any]] = Field(default_factory=list)
     failed: list[dict[str, Any]] = Field(default_factory=list)
     skipped: list[dict[str, Any]] = Field(default_factory=list)

@@ -261,6 +261,7 @@ class MemoryOptimizationAgent(BaseMemoryAgent):
                 "actions_executed": execution.summary.get("executed", 0),
                 "actions_failed": execution.summary.get("failed", 0),
                 "snapshot_id": execution.snapshot_id,
+                "error": execution.error,
                 "dry_run": dry_run,
             },
         }

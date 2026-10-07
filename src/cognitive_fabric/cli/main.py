@@ -277,6 +277,10 @@ def optimize(
         click.echo(f"Actions Failed: {summary.get('actions_failed', 0)}")
         if summary.get("snapshot_id"):
             click.echo(f"Snapshot ID: {summary.get('snapshot_id')}")
+        if summary.get("error"):
+            click.echo("")
+            click.echo(f"Error: {summary['error']}", err=True)
+            sys.exit(1)
         if dry_run:
             click.echo("")
             click.echo("(Dry run - no changes made)")

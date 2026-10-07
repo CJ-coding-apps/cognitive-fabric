@@ -97,7 +97,8 @@ class MemoryService:
 
         # Create snapshot service
         from cognitive_fabric.services.snapshot_service import SnapshotService
-        self._snapshot_service = SnapshotService(self._db_path, self._container)
+
+        self._snapshot_service = SnapshotService(self._kuzu_client)
 
         self._initialized = True
         logger.info("MemoryService initialization complete")

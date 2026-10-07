@@ -72,7 +72,13 @@ class Settings(BaseSettings):
     # operator believes a cap exists and behaves accordingly.
     optimizer_max_deletions: Optional[int] = Field(default=None, ge=0)
     optimizer_enable_mcp_sampling: bool = True
-    optimizer_snapshot_failure_policy: Literal["abort", "continue", "warn"] = "warn"
+    # What to do when the pre-deletion snapshot cannot be taken.
+    #
+    # "abort" -- do not delete, report why. That is the default because the
+    # whole point of the snapshot is that a deletion can be undone; a run that
+    # deletes without one is the failure this setting exists to prevent. The
+    # other two values are an explicit opt-out, not the other way round.
+    optimizer_snapshot_failure_policy: Literal["abort", "continue", "warn"] = "abort"
     optimizer_default_sampling_strategy: Literal[
         "representative", "problematic", "recent", "diverse"
     ] = "representative"
