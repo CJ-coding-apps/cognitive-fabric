@@ -157,3 +157,61 @@ class TestThePlanLimitCapsOnlyDeletions:
         actions = [self._action(f"d{i}", "delete") for i in range(15)]
         kept = self._apply(actions, "aggressive")
         assert len(kept) == 2
+
+
+class TestTheDefaultStrategyHasOneHome:
+    """Every entry point resolves the default from `Settings`, not a literal.
+
+    Three user-facing paths used to spell `"balanced"` themselves -- the MCP
+    schema, `agent.run`, and the plan prompt -- so
+    `COGNITIVE_FABRIC_OPTIMIZER_DEFAULT_STRATEGY` changed nothing any of them
+    did. The configured default is `conservative`; a path that quietly says
+    `balanced` deletes five times as many entities as the operator asked for.
+    """
+
+    def _strategy_run_passes_to_optimize(self, **kwargs):
+        import asyncio
+        from unittest.mock import MagicMock
+
+        from cognitive_fabric.agents.memory_optimizer.agent import (
+            MemoryOptimizationAgent,
+        )
+
+        agent = MemoryOptimizationAgent(MagicMock())
+        seen = {}
+
+        async def capture(**call_kwargs):
+            seen.update(call_kwargs)
+            return {}
+
+        agent.optimize = capture
+        asyncio.run(agent.run(repository="r", branch="main", **kwargs))
+        return seen
+
+    def test_an_unspecified_strategy_resolves_to_the_configured_one(self, monkeypatch):
+        from cognitive_fabric.config import settings as cf_settings
+        from cognitive_fabric.types.optimization import OptimizationStrategy
+
+        monkeypatch.setattr(cf_settings, "optimizer_default_strategy", "aggressive")
+        passed = self._strategy_run_passes_to_optimize()
+        assert passed["strategy"] == OptimizationStrategy.AGGRESSIVE
+
+    def test_an_explicit_strategy_still_wins(self):
+        from cognitive_fabric.types.optimization import OptimizationStrategy
+
+        passed = self._strategy_run_passes_to_optimize(strategy="aggressive")
+        assert passed["strategy"] is OptimizationStrategy.AGGRESSIVE
+
+    def test_an_unrecognised_strategy_is_refused_not_defaulted(self):
+        # `run` turns an unrecognised name into a ValueError rather than
+        # falling back to the configured default. This deletes memory, so a
+        # mistyped name must not quietly become a strategy the operator did
+        # not choose -- and it must not quietly become *no* strategy either.
+        with pytest.raises(ValueError):
+            self._strategy_run_passes_to_optimize(strategy="louvain-typo")
+
+    def test_the_plan_prompt_names_a_missing_strategy_instead_of_inventing_one(self):
+        from cognitive_fabric.agents.memory_optimizer.prompt_manager import PromptManager
+
+        with pytest.raises(KeyError):
+            PromptManager().build_optimization_prompt({})

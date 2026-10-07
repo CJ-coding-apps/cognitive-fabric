@@ -201,8 +201,11 @@ def info(ctx: click.Context, db_path: str) -> None:
     "--strategy",
     "-s",
     type=click.Choice(["conservative", "balanced", "aggressive"]),
-    default="balanced",
-    help="Optimization strategy",
+    default=None,
+    help=(
+        "Optimization strategy. Defaults to "
+        "COGNITIVE_FABRIC_OPTIMIZER_DEFAULT_STRATEGY, which is conservative."
+    ),
 )
 @click.option(
     "--dry-run",
@@ -224,6 +227,7 @@ def optimize(
     on the selected strategy.
     """
     from cognitive_fabric.agents.memory_optimizer import MemoryOptimizationAgent
+    from cognitive_fabric.config import settings
     from cognitive_fabric.services.memory_service import MemoryService
     from cognitive_fabric.types.optimization import OptimizationStrategy
 
@@ -231,7 +235,14 @@ def optimize(
         memory_service = await MemoryService.get_instance(db_path)
         agent = MemoryOptimizationAgent(memory_service)
 
-        strategy_enum = OptimizationStrategy(strategy)
+        # Unset means the configured default rather than a number compiled into
+        # this command. It used to be a hardcoded `balanced`, which both made
+        # the CLI's default disagree with the documented and configured one
+        # (`conservative`) and meant COGNITIVE_FABRIC_OPTIMIZER_DEFAULT_STRATEGY
+        # had no effect on this path at all.
+        strategy_enum = OptimizationStrategy(
+            strategy or settings.optimizer_default_strategy
+        )
 
         if ctx.obj.get("verbose"):
             click.echo(f"Analyzing {repository}:{branch}...", err=True)
@@ -308,7 +319,6 @@ def rollback(
 @click.argument("db_path", type=click.Path(exists=True))
 @click.argument("repository")
 @click.option("--branch", "-b", default="main", help="Branch name")
-@click.option("--limit", "-n", default=10, help="Maximum number of snapshots")
 @click.option("--json", "json_output", is_flag=True, help="Output as JSON")
 @click.pass_context
 def list_snapshots(
@@ -316,7 +326,6 @@ def list_snapshots(
     db_path: str,
     repository: str,
     branch: str,
-    limit: int,
     json_output: bool,
 ) -> None:
     """List available snapshots for a repository."""
@@ -327,7 +336,7 @@ def list_snapshots(
         memory_service = await MemoryService.get_instance(db_path)
         agent = MemoryOptimizationAgent(memory_service)
 
-        snapshots = await agent.list_snapshots(repository, branch, limit)
+        snapshots = await agent.list_snapshots(repository, branch)
 
         if json_output:
             click.echo(json.dumps(snapshots, indent=2, default=str))

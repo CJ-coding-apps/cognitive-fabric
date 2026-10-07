@@ -49,7 +49,7 @@ class OptimizationPlanService:
         self,
         repository: str,
         branch: str = "main",
-        strategy: OptimizationStrategy = OptimizationStrategy.BALANCED,
+        strategy: Optional[OptimizationStrategy] = None,
         use_llm: bool = False,
         llm_client: Optional[Any] = None,
         model_name: Optional[str] = None,
@@ -59,7 +59,8 @@ class OptimizationPlanService:
         Args:
             repository: The repository name.
             branch: The branch name.
-            strategy: The optimization strategy.
+            strategy: The optimization strategy. Unset means the configured
+                default, COGNITIVE_FABRIC_OPTIMIZER_DEFAULT_STRATEGY.
             use_llm: Whether to use LLM for planning.
             llm_client: Optional LLM client.
             model_name: The model to ask for. Comes from configuration, via the
@@ -68,6 +69,9 @@ class OptimizationPlanService:
         Returns:
             The optimization plan.
         """
+        strategy = strategy or OptimizationStrategy(
+            default_settings.optimizer_default_strategy
+        )
         logger.info(
             "Creating optimization plan",
             repository=repository,

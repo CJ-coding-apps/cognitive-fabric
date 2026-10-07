@@ -747,8 +747,8 @@
             "balanced",
             "aggressive"
           ],
-          "description": "Optimization strategy",
-          "default": "balanced"
+          "description": "Optimization strategy. Unset means COGNITIVE_FABRIC_OPTIMIZER_DEFAULT_STRATEGY.",
+          "default": "conservative"
         },
         "dryRun": {
           "type": "boolean",

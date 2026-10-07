@@ -337,16 +337,12 @@ class OptimizationExecutionService:
         )
 
         try:
-            result = await self._snapshot_service.restore_snapshot(
-                repository, snapshot_id, branch
-            )
-
-            return {
-                "success": True,
-                "message": f"Rolled back to snapshot {snapshot_id}",
-                "restored_entities": result.get("restored_entities", 0),
-            }
-
+            # `rollback_to_snapshot` is the method on SnapshotService. This
+            # called `restore_snapshot`, which does not exist, so every rollback
+            # raised AttributeError -- swallowed by the `except` below and
+            # reported to the CLI's operator as "Rollback failed: <that>",
+            # indistinguishable from a runtime failure.
+            result = await self._snapshot_service.rollback_to_snapshot(snapshot_id)
         except Exception as e:
             logger.error("Rollback failed", error=str(e))
             return {
@@ -354,22 +350,31 @@ class OptimizationExecutionService:
                 "error": str(e),
             }
 
+        # The service decides whether the rollback happened; this used to
+        # return `success: True` unconditionally, so a rollback of a snapshot
+        # that does not exist reported success to the operator.
+        if not result.get("success"):
+            logger.error("Rollback refused", error=result.get("error"))
+            return {
+                "success": False,
+                "error": result.get("error", f"Rollback refused: {snapshot_id}"),
+            }
+
+        return result
+
     async def list_snapshots(
         self,
         repository: str,
         branch: str = "main",
-        limit: int = 10,
     ) -> List[Dict[str, Any]]:
         """List available snapshots.
 
         Args:
             repository: The repository name.
             branch: The branch name.
-            limit: Maximum number of snapshots to return.
 
         Returns:
             List of snapshot metadata.
         """
-        return await self._snapshot_service.list_snapshots(
-            repository, branch, limit
-        )
+        snapshots = await self._snapshot_service.list_snapshots(repository, branch)
+        return [s.model_dump(mode="json") for s in snapshots]

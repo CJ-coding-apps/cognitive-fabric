@@ -18,6 +18,7 @@ from cognitive_fabric.agents.memory_optimizer.services.execution import (
 from cognitive_fabric.agents.memory_optimizer.services.planning import (
     OptimizationPlanService,
 )
+from cognitive_fabric.config import settings as default_settings
 from cognitive_fabric.services.memory_service import MemoryService
 from cognitive_fabric.services.snapshot_service import SnapshotService
 from cognitive_fabric.types.optimization import (
@@ -57,11 +58,13 @@ class MemoryOptimizationAgent(BaseMemoryAgent):
         super().__init__(memory_service)
         self._llm_client = llm_client
 
-        # Create snapshot service if not provided
-        if snapshot_service is None:
-            self._snapshot_service = SnapshotService(memory_service)
-        else:
-            self._snapshot_service = snapshot_service
+        # The service already builds its own snapshot service; reuse it rather
+        # than construct a second one. This line used to call
+        # `SnapshotService(memory_service)`, which takes `db_path` and
+        # `container` instead, so every caller that omitted the argument -- the
+        # CLI's optimize, rollback and list-snapshots -- raised a TypeError
+        # before doing any work.
+        self._snapshot_service = snapshot_service or memory_service.snapshot
 
         # Initialize components
         self._context_builder = MemoryContextBuilder(memory_service)
@@ -135,7 +138,7 @@ class MemoryOptimizationAgent(BaseMemoryAgent):
         self,
         repository: str,
         branch: str = "main",
-        strategy: OptimizationStrategy = OptimizationStrategy.BALANCED,
+        strategy: Optional[OptimizationStrategy] = None,
         use_llm: bool = False,
     ) -> OptimizationPlan:
         """Create an optimization plan for a memory bank.
@@ -143,12 +146,16 @@ class MemoryOptimizationAgent(BaseMemoryAgent):
         Args:
             repository: The repository name.
             branch: The branch name.
-            strategy: The optimization strategy.
+            strategy: The optimization strategy. Unset means the configured
+                default, COGNITIVE_FABRIC_OPTIMIZER_DEFAULT_STRATEGY.
             use_llm: Whether to use LLM for enhanced planning.
 
         Returns:
             The optimization plan.
         """
+        strategy = strategy or OptimizationStrategy(
+            default_settings.optimizer_default_strategy
+        )
         use_llm = use_llm and self._llm_client is not None
         logger.info(
             "Creating optimization plan",
@@ -200,7 +207,7 @@ class MemoryOptimizationAgent(BaseMemoryAgent):
         self,
         repository: str,
         branch: str = "main",
-        strategy: OptimizationStrategy = OptimizationStrategy.BALANCED,
+        strategy: Optional[OptimizationStrategy] = None,
         use_llm: bool = False,
         dry_run: bool = False,
         create_snapshot: bool = True,
@@ -210,7 +217,8 @@ class MemoryOptimizationAgent(BaseMemoryAgent):
         Args:
             repository: The repository name.
             branch: The branch name.
-            strategy: The optimization strategy.
+            strategy: The optimization strategy. Unset means the configured
+                default, COGNITIVE_FABRIC_OPTIMIZER_DEFAULT_STRATEGY.
             use_llm: Whether to use LLM for enhanced analysis/planning.
             dry_run: If True, simulate without making changes.
             create_snapshot: Whether to create a snapshot before execution.
@@ -218,6 +226,9 @@ class MemoryOptimizationAgent(BaseMemoryAgent):
         Returns:
             Combined results from analysis, planning, and execution.
         """
+        strategy = strategy or OptimizationStrategy(
+            default_settings.optimizer_default_strategy
+        )
         logger.info(
             "Starting full optimization workflow",
             repository=repository,
@@ -285,21 +296,17 @@ class MemoryOptimizationAgent(BaseMemoryAgent):
         self,
         repository: str,
         branch: str = "main",
-        limit: int = 10,
     ) -> List[Dict[str, Any]]:
         """List available snapshots.
 
         Args:
             repository: The repository name.
             branch: The branch name.
-            limit: Maximum number of snapshots to return.
 
         Returns:
             List of snapshot metadata.
         """
-        return await self._execution_service.list_snapshots(
-            repository, branch, limit
-        )
+        return await self._execution_service.list_snapshots(repository, branch)
 
     async def get_component_details(
         self,
@@ -345,7 +352,7 @@ class MemoryOptimizationAgent(BaseMemoryAgent):
         Returns:
             Optimization results.
         """
-        strategy_str = kwargs.get("strategy", "balanced")
+        strategy_str = kwargs.get("strategy", default_settings.optimizer_default_strategy)
         strategy = OptimizationStrategy(strategy_str)
 
         return await self.optimize(

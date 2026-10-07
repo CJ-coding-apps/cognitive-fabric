@@ -2,6 +2,7 @@
 
 from typing import Dict, List, Optional
 
+from cognitive_fabric.config import settings
 from cognitive_fabric.mcp.tools.base import McpTool
 
 # Tool 1: memory-bank
@@ -704,8 +705,11 @@ MEMORY_OPTIMIZER_TOOL = McpTool.create(
         "strategy": {
             "type": "string",
             "enum": ["conservative", "balanced", "aggressive"],
-            "description": "Optimization strategy",
-            "default": "balanced",
+            "description": (
+                "Optimization strategy. Unset means "
+                "COGNITIVE_FABRIC_OPTIMIZER_DEFAULT_STRATEGY."
+            ),
+            "default": settings.optimizer_default_strategy,
         },
         "dryRun": {
             "type": "boolean",
@@ -769,13 +773,13 @@ MEMORY_OPTIMIZER_TOOL = McpTool.create(
             "description": (
                 "TS wire: attach a sampled memory context to analysis"
             ),
-            "default": True,
+            "default": settings.optimizer_enable_mcp_sampling,
         },
         "samplingStrategy": {
             "type": "string",
             "enum": ["representative", "problematic", "recent", "diverse"],
             "description": "TS wire: memory sampling strategy",
-            "default": "representative",
+            "default": settings.optimizer_default_sampling_strategy,
         },
         "snapshotFailurePolicy": {
             "type": "string",
@@ -784,7 +788,7 @@ MEMORY_OPTIMIZER_TOOL = McpTool.create(
                 "TS wire: behavior when pre-optimization snapshot creation "
                 "fails"
             ),
-            "default": "warn",
+            "default": settings.optimizer_snapshot_failure_policy,
         },
         "description": {
             "type": "string",

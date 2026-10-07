@@ -195,7 +195,11 @@ Format your response as JSON with the following structure:
         Returns:
             The formatted optimization prompt.
         """
-        strategy = context.get("strategy", "balanced")
+        # `build_optimization_context` always sets this; a context without one
+        # is a caller bug, and a KeyError names it. A `"balanced"` default here
+        # was a second home for the strategy choice, free to disagree with the
+        # configured default.
+        strategy = context["strategy"]
         candidates = context.get("optimization_candidates", {})
         strategy_config = context.get("strategy_config", {})
 

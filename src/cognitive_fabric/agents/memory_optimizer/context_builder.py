@@ -176,10 +176,14 @@ class MemoryContextBuilder:
     async def build_optimization_context(
         self,
         repository: str,
-        branch: str = "main",
-        strategy: str = "balanced",
+        branch: str,
+        strategy: str,
     ) -> Dict[str, Any]:
         """Build context for optimization planning.
+
+        `strategy` is required. It defaulted to `"balanced"`, which is a
+        deletion-affecting choice spelled as a keyword default in a third
+        place, with no reader: the one caller always passes it.
 
         Args:
             repository: The repository name.
@@ -199,6 +203,12 @@ class MemoryContextBuilder:
         # Build optimization candidates
         candidates = []
 
+        # Resolved before the loop: it used to be assigned inside it and read
+        # after, so a repository with no components raised UnboundLocalError
+        # instead of reporting that there was nothing to optimize.
+        container = await self._memory_service.get_service_container()
+        comp_repo = await container.get_component_repository()
+
         for component in components:
             candidate = {
                 "id": component.id,
@@ -214,8 +224,6 @@ class MemoryContextBuilder:
                 candidate["reasons"].append("deprecated_status")
 
             # Check if orphaned (no dependencies and no dependents)
-            container = await self._memory_service.get_service_container()
-            comp_repo = await container.get_component_repository()
             dependents = await comp_repo.get_dependents(
                 repository, component.id, branch
             )
