@@ -34,14 +34,17 @@ tree-sitter, embedding, and LLM work all run in-process.
 
 ## Installation
 
-Requires Python 3.11+.
+Requires Python 3.11–3.13. CI runs the suite on all three, on Linux. Python 3.14
+is excluded deliberately: `kuzu` 0.11.3 — the final release, and the version this
+package pins — ships no 3.14 wheels for macOS or Windows, so on those platforms
+pip would try to build Kùzu's C++ from source.
 
 ```bash
 # Base install (memory bank + fabric ingestion via tree-sitter)
 pip install cognitive-fabric
 
 # Semantic search: LanceDB + fastembed local embeddings (pure ONNX, no torch —
-# works everywhere, incl. Python 3.13)
+# works on every Python this package supports)
 pip install 'cognitive-fabric[semantic]'
 
 # Or just the vector store (LanceDB), for an injected embedder

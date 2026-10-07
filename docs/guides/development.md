@@ -7,7 +7,7 @@ This guide covers development setup, coding standards, and contribution guidelin
 ### Prerequisites
 
 - Docker and Docker Compose (recommended)
-- Python 3.11+ (for local development)
+- Python 3.11–3.13 (for local development)
 - Git
 
 ### Setup with Docker (Recommended)

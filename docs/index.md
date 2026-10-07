@@ -59,7 +59,7 @@ Cognitive-Fabric enables AI assistants to maintain persistent, structured memory
 
 ## System Requirements
 
-- Python 3.11 or higher
+- Python 3.11–3.13 (3.14 is excluded by `requires-python`; see the README)
 - Docker (recommended for development)
 - 512MB RAM minimum
 - 100MB disk space for database
