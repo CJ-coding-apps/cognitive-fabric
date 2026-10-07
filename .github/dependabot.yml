@@ -1,0 +1,76 @@
+# Dependabot is configured rather than switched off.
+#
+# Left at the default, this opens a PR per dependency per week, which in practice
+# is a queue nobody can merge. This repository holds two dependencies deliberately
+# (kuzu, mcp) and caps two more (the cloud SDKs), so an ungrouped config would
+# spend most of its PRs proposing to lift exactly the pins that are there on
+# purpose. One grouped PR per ecosystem per month is a size a person can review in
+# one sitting.
+#
+# The `ignore` entries below restate decisions already written into
+# pyproject.toml. If a pin is lifted there, lift it here too -- otherwise this file
+# goes on suppressing updates nobody still means to suppress. Note that Dependabot
+# reads this file only from the default branch, so changes here take effect at the
+# next merge to `main`, not at the push.
+#
+# There are deliberately no `labels:` entries: requesting a label that does not
+# exist in the repository gives you a PR that carries a "could not be found"
+# warning and no labels at all. Create them first if you want them.
+
+version: 2
+
+updates:
+  # ------------------------------------------------------------------ Python deps
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    commit-message:
+      prefix: "deps"
+    groups:
+      pip:
+        patterns: ["*"]
+    ignore:
+      # Pinned exactly in pyproject.toml. kuzu is archived upstream -- 0.11.3 is the
+      # final release -- and its file format is not stable before 1.0, so a bump can
+      # leave an existing graph unreadable. Lifting this pin needs a migration step,
+      # not a dependency bump.
+      - dependency-name: "kuzu"
+
+      # Capped below 2 in pyproject.toml: the 2.x SDK removed the low-level Server
+      # list_tools/call_tool decorators that the server is built on.
+      - dependency-name: "mcp"
+        versions: [">= 2.0.0"]
+
+      # The two cloud SDKs in the `[cloud]` extra are deliberately *not* ignored,
+      # though they are capped in pyproject.toml. An ignore would suppress the one
+      # PR that would show you a break: an SDK major rewrote the request types under
+      # its callers once already, and the failure arrived as a runtime TypeError on a
+      # user's machine. A major bump now opens a PR proposing to lift the cap, and
+      # the live-provider smoke workflow (Actions -> Live provider smoke -> Run
+      # workflow) is what says whether the new SDK still accepts the request this
+      # package builds. A green install proves nothing about the request shape.
+
+  # ----------------------------------------------------------------- GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    commit-message:
+      prefix: "ci"
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  # ------------------------------------------------------------------ Docker images
+  # The Dockerfile's base image is the only docker dependency here; nothing is held,
+  # so this is a plain grouped update.
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    commit-message:
+      prefix: "docker"
+    groups:
+      docker:
+        patterns: ["*"]

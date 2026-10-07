@@ -747,20 +747,8 @@
             "balanced",
             "aggressive"
           ],
-          "description": "Optimization strategy",
-          "default": "balanced"
-        },
-        "llmProvider": {
-          "type": "string",
-          "enum": [
-            "openai",
-            "anthropic"
-          ],
-          "description": "TS wire: LLM provider for enhanced analysis (degrades gracefully without a live key)"
-        },
-        "model": {
-          "type": "string",
-          "description": "TS wire: LLM model name (e.g. o1-mini, claude)"
+          "description": "Optimization strategy. Unset means COGNITIVE_FABRIC_OPTIMIZER_DEFAULT_STRATEGY.",
+          "default": "conservative"
         },
         "dryRun": {
           "type": "boolean",
@@ -821,16 +809,6 @@
           ],
           "description": "TS wire: memory sampling strategy",
           "default": "representative"
-        },
-        "snapshotFailurePolicy": {
-          "type": "string",
-          "enum": [
-            "abort",
-            "continue",
-            "warn"
-          ],
-          "description": "TS wire: behavior when pre-optimization snapshot creation fails",
-          "default": "warn"
         },
         "description": {
           "type": "string",

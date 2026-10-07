@@ -26,8 +26,11 @@ COPY pyproject.toml ./
 COPY README.md ./
 COPY src/ ./src/
 
-# Install dependencies using uv
-RUN uv pip install --system -e .
+# Install dependencies using uv. `[cloud]` because the image serves the
+# `memory-optimizer` tool, which needs a provider SDK whenever an operator has
+# configured a key; the SDKs moved out of the core dependencies, so an install
+# that wants them has to ask. No `[semantic]`: this image never had it.
+RUN uv pip install --system -e '.[cloud]'
 
 # Create data directory
 RUN mkdir -p /app/data && chown -R cognitive_fabric:cognitive_fabric /app
@@ -39,9 +42,13 @@ USER cognitive_fabric
 VOLUME ["/app/data"]
 
 # Default environment variables
+# COGNITIVE_FABRIC_LOG_JSON, not a *_LOG_FORMAT name: the latter is not a field of
+# Settings, so pydantic-settings ignored it and the image logged by the setting's
+# own default rather than as this file claimed. The name is derived from the
+# field, so there is no alias to add.
 ENV COGNITIVE_FABRIC_DB_PATH=/app/data/cognitive_fabric.db \
     COGNITIVE_FABRIC_LOG_LEVEL=INFO \
-    COGNITIVE_FABRIC_LOG_FORMAT=json
+    COGNITIVE_FABRIC_LOG_JSON=true
 
 # Entry point for the MCP server
 CMD ["python", "-m", "cognitive_fabric.main"]

@@ -1,5 +1,6 @@
 """Logging configuration using structlog."""
 
+import logging
 import sys
 from typing import Any
 
@@ -11,7 +12,10 @@ def configure_logging(json_output: bool = True, log_level: str = "INFO") -> None
 
     Args:
         json_output: If True, output JSON format. If False, use console format.
-        log_level: The logging level (DEBUG, INFO, WARNING, ERROR).
+        log_level: The minimum level to emit (DEBUG, INFO, WARNING, ERROR).
+            Records below it are dropped. This argument was accepted and then
+            not used, so `--log-level` and `COGNITIVE_FABRIC_LOG_LEVEL` both
+            changed nothing; the filtering bound logger is what reads it.
     """
     # NOTE: structlog.stdlib.add_logger_name requires a stdlib logger with a
     # `.name`; it is incompatible with PrintLoggerFactory (used below) and is
@@ -30,7 +34,9 @@ def configure_logging(json_output: bool = True, log_level: str = "INFO") -> None
 
     structlog.configure(
         processors=processors,
-        wrapper_class=structlog.stdlib.BoundLogger,
+        wrapper_class=structlog.make_filtering_bound_logger(
+            logging.getLevelNamesMapping()[log_level.upper()]
+        ),
         context_class=dict,
         logger_factory=structlog.PrintLoggerFactory(file=sys.stderr),
         cache_logger_on_first_use=True,

@@ -12,8 +12,8 @@ This guide will help you get Cognitive-Fabric up and running quickly.
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-repo/cognitive_fabric-mcp.git
-cd cognitive_fabric-mcp
+git clone https://github.com/CJ-coding-apps/cognitive-fabric.git
+cd cognitive-fabric
 ```
 
 ### 2. Build the Container
@@ -53,10 +53,15 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 ```
 
+Add `cloud` if you intend to use a hosted provider —
+`pip install -e ".[dev,cloud]"` — which brings in the OpenAI and Anthropic SDKs
+for the dream engine / memory optimizer. Without it, those paths report the
+missing SDK instead of failing on import.
+
 ### 3. Run the Server
 
 ```bash
-cognitive_fabric serve
+cognitive-fabric serve
 ```
 
 ## Integrating with Claude Code
@@ -74,7 +79,7 @@ Add Cognitive-Fabric to your Claude Code MCP settings:
       "command": "docker",
       "args": [
         "compose",
-        "-f", "/path/to/cognitive_fabric-mcp/docker-compose.yml",
+        "-f", "/path/to/cognitive-fabric/docker-compose.yml",
         "run", "--rm", "-T", "cognitive_fabric"
       ]
     }
@@ -88,7 +93,7 @@ Add Cognitive-Fabric to your Claude Code MCP settings:
 {
   "mcpServers": {
     "cognitive_fabric": {
-      "command": "cognitive_fabric-server"
+      "command": "cognitive-fabric-server"
     }
   }
 }

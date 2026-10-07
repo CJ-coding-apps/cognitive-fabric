@@ -12,11 +12,19 @@ from pydantic import BaseModel, Field
 
 
 class OptimizationStrategy(str, Enum):
-    """Optimization aggressiveness strategy."""
+    """Optimization aggressiveness strategy.
 
-    CONSERVATIVE = "conservative"  # 6 months stale threshold, max 5 deletions
-    BALANCED = "balanced"  # 3 months stale threshold, max 20 deletions
-    AGGRESSIVE = "aggressive"  # 1 month stale threshold, max 50 deletions
+    The per-strategy numbers -- staleness threshold and deletion limit -- live
+    in one place: `agents.memory_optimizer.context_builder.STRATEGY_CONFIGS`,
+    which is what the planner and the tool handler both read. They used to be
+    restated here as comments and again as a second `STRATEGY_CONFIGS` dict in
+    this module, and the copies disagreed -- this file said `balanced` deletes
+    at most 20 while the code that deletes said 50.
+    """
+
+    CONSERVATIVE = "conservative"
+    BALANCED = "balanced"
+    AGGRESSIVE = "aggressive"
 
 
 class SamplingStrategy(str, Enum):
@@ -54,46 +62,6 @@ class EntityType(str, Enum):
     FILE = "file"
     CONTEXT = "context"
     TAG = "tag"
-
-
-# =============================================================================
-# Strategy Configuration
-# =============================================================================
-
-
-class StrategyConfig(BaseModel):
-    """Configuration for an optimization strategy."""
-
-    stale_days_threshold: int
-    max_deletions: int
-    require_confirmation: bool = True
-    preserve_recent_days: int = 7
-    min_health_score: float = 0.3
-
-
-STRATEGY_CONFIGS: dict[OptimizationStrategy, StrategyConfig] = {
-    OptimizationStrategy.CONSERVATIVE: StrategyConfig(
-        stale_days_threshold=180,
-        max_deletions=5,
-        require_confirmation=True,
-        preserve_recent_days=30,
-        min_health_score=0.5,
-    ),
-    OptimizationStrategy.BALANCED: StrategyConfig(
-        stale_days_threshold=90,
-        max_deletions=20,
-        require_confirmation=True,
-        preserve_recent_days=14,
-        min_health_score=0.3,
-    ),
-    OptimizationStrategy.AGGRESSIVE: StrategyConfig(
-        stale_days_threshold=30,
-        max_deletions=50,
-        require_confirmation=False,
-        preserve_recent_days=7,
-        min_health_score=0.2,
-    ),
-}
 
 
 # =============================================================================
@@ -239,13 +207,20 @@ class OptimizationResult(BaseModel):
 
 
 class SnapshotInfo(BaseModel):
-    """Information about a saved snapshot."""
+    """Information about a saved snapshot.
 
-    snapshot_id: str
+    `id` is the key the snapshot manifest, `rollback_to_snapshot` and
+    `list_snapshots` all look it up by; the field was `snapshot_id`, so every
+    `SnapshotInfo(...)` the service built raised a ValidationError for the
+    missing field and no snapshot was ever recorded.
+    """
+
+    id: str
     created_at: datetime
     repository: str
     branch: str
-    entity_counts: dict[str, int]
+    # None means this snapshot did not count entities, not that it holds none.
+    entity_counts: Optional[dict[str, int]] = None
     description: Optional[str] = None
     size_bytes: int
 
@@ -370,6 +345,10 @@ class ExecutionResult(BaseModel):
     branch: str
     snapshot_id: Optional[str] = None
     dry_run: bool
+    # Set when the run was stopped before executing anything -- today, only
+    # when the pre-deletion snapshot could not be taken and the configured
+    # policy is to abort. When it is set, no action ran.
+    error: Optional[str] = None
     executed: list[dict[str, Any]] = Field(default_factory=list)
     failed: list[dict[str, Any]] = Field(default_factory=list)
     skipped: list[dict[str, Any]] = Field(default_factory=list)

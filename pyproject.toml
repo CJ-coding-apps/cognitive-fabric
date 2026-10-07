@@ -4,10 +4,20 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cognitive-fabric"
-version = "1.0.0"
+version = "0.1.0"
 description = "Cognitive Fabric: unified Python MCP server for a KuzuDB graph memory bank with symbolic ingestion, semantic search, and distillation"
 readme = "README.md"
-requires-python = ">=3.11"
+# The ceiling is Kùzu's, not ours. `kuzu==0.11.3` (pinned below) publishes cp314
+# wheels for Linux only -- its macOS and Windows wheels stop at cp313. On 3.14
+# those two platforms get no wheel, so pip falls back to the 19 MB sdist and
+# tries to compile Kùzu's C++ from source; that usually fails with an error
+# naming neither this package nor the reason. Declaring the ceiling turns it
+# into one clear line from pip, before anything is downloaded.
+#
+# Lifting it means Kùzu (or the Kùzu pin) is resolved first. It is recorded with
+# the other Kùzu consequences in the project's open decisions; do not widen this
+# line on its own.
+requires-python = ">=3.11,<3.14"
 license = "Apache-2.0"
 authors = [
     { name = "Jim Cuttler", email = "jimcuttler@gmail.com" }
@@ -24,8 +34,6 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "structlog>=24.0.0",
     "click>=8.1.0",
-    "openai>=1.0.0",
-    "anthropic>=0.20.0",
     # Streamable-HTTP transport (opt-in via `serve --transport http`). These are
     # already pulled in by mcp, but declared explicitly since the server imports
     # them directly.
@@ -44,21 +52,62 @@ dev = [
     "ruff>=0.3.0",
     "mypy>=1.8.0",
 ]
-# Vector store only (LanceDB). Enough for semantic search with OpenAI
-# embeddings (OPENAI_API_KEY) or an injected embedder.
+# Talking to a hosted LLM: the memory optimizer's Dream engine, and the OpenAI
+# embedding backend. Optional because this package is local-first -- a purely
+# local install (KuzuDB + tree-sitter + local embeddings) should not download two
+# vendor SDKs it will never call. Absent, each path fails with the setting or the
+# extra to install rather than an ImportError, since both imports are guarded.
+#
+# Each is capped below the next major. These are the two dependencies whose
+# major releases change the request shapes this package builds against: an SDK
+# major has removed a parameter the other repo's providers were still passing,
+# and the break surfaced as a runtime TypeError on a user's machine rather than
+# at install. A cap turns that into a Dependabot PR proposing the lift, which is
+# a thing a person reviews. Do not lift without re-running the live-provider
+# smoke workflow against the proposed version.
+cloud = [
+    "openai>=1.0.0,<4",
+    "anthropic>=0.20.0,<2",
+]
+# Vector store only (LanceDB). Enough for semantic search with an injected
+# embedder; the OpenAI embedding backend additionally needs the `cloud` extra.
+#
+# Capped below 0.26, which resolves to 0.25.3 — the version this code is tested
+# against, and the same cap docugraph carries. Two reasons, either sufficient:
+#
+#   * `VectorStore` calls `table_names()`, and lancedb >= 0.30 deprecates it in
+#     favour of `list_tables()`. That is not a rename -- the replacement returns
+#     a paginated response rather than an iterable of names -- so it is a
+#     migration. `filterwarnings` below turns a deprecation raised through our
+#     own frame into an error, which is how this surfaced: with an unbounded
+#     range CI installed an API this code has never run against, and went red
+#     the first time those vector-store tests actually ran.
+#   * 0.26 dropped the macOS x86_64 wheels.
+#
+# So the ceiling is what makes the declared range honest. Lifting it is a
+# Dependabot PR a person reviews, the same shape as the `cloud` caps above.
+# Do not lift it by widening this line; lift it by migrating to `list_tables()`
+# and re-running the vector-store tests.
 vectordb = [
-    "lancedb>=0.6.0",
+    "lancedb>=0.6.0,<0.26",
 ]
 # Recommended local semantic layer: LanceDB + fastembed (pure-ONNX embeddings,
-# no torch — works everywhere, including Python 3.13).
+# no torch — works on every Python this package supports).
 semantic = [
-    "lancedb>=0.6.0",
+    "lancedb>=0.6.0,<0.26",
     "fastembed>=0.4.0",
 ]
 # Optional heavier alternative: local embeddings via sentence-transformers
 # (requires torch, which has no wheel for some Python versions).
+#
+# NOT covered by CI: no job installs this extra, so it is the one embedding
+# backend with no test behind it. It is kept rather than dropped because
+# `sentence-transformers` is a documented value of
+# COGNITIVE_FABRIC_FABRIC_EMBEDDING_PROVIDER, and removing the extra would leave
+# that setting with no supported install route. Treat any defect found in this
+# path as a defect in untested code.
 semantic-st = [
-    "lancedb>=0.6.0",
+    "lancedb>=0.6.0,<0.26",
     "sentence-transformers>=2.6.0",
 ]
 

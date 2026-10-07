@@ -53,7 +53,7 @@ Claude creates each component:
   "tool": "entity",
   "arguments": {
     "operation": "create",
-    "type": "component",
+    "entityType": "component",
     "repository": "e-commerce-api",
     "data": {
       "id": "user-service",
@@ -74,7 +74,7 @@ Claude creates each component:
   "tool": "entity",
   "arguments": {
     "operation": "update",
-    "type": "component",
+    "entityType": "component",
     "repository": "e-commerce-api",
     "id": "order-service",
     "data": {
@@ -93,7 +93,7 @@ Claude creates each component:
   "tool": "entity",
   "arguments": {
     "operation": "create",
-    "type": "decision",
+    "entityType": "decision",
     "repository": "e-commerce-api",
     "data": {
       "id": "adr-001",
@@ -115,7 +115,7 @@ Claude creates each component:
   "tool": "entity",
   "arguments": {
     "operation": "create",
-    "type": "rule",
+    "entityType": "rule",
     "repository": "e-commerce-api",
     "data": {
       "id": "rule-health-check",
@@ -139,7 +139,7 @@ Claude creates each component:
   "tool": "entity",
   "arguments": {
     "operation": "create",
-    "type": "tag",
+    "entityType": "tag",
     "repository": "e-commerce-api",
     "data": {
       "id": "tag-backend",
@@ -160,7 +160,7 @@ Claude creates each component:
 {
   "tool": "associate",
   "arguments": {
-    "operation": "tag-item",
+    "type": "tag-item",
     "repository": "e-commerce-api",
     "tagId": "tag-backend",
     "itemId": "user-service",
@@ -179,7 +179,7 @@ Claude creates each component:
 {
   "tool": "query",
   "arguments": {
-    "operation": "entities",
+    "type": "entities",
     "repository": "e-commerce-api",
     "entityType": "component"
   }
@@ -194,10 +194,10 @@ Claude creates each component:
 {
   "tool": "query",
   "arguments": {
-    "operation": "dependencies",
+    "type": "dependencies",
     "repository": "e-commerce-api",
     "componentId": "order-service",
-    "direction": "upstream"
+    "direction": "out"
   }
 }
 ```
@@ -210,7 +210,7 @@ Claude creates each component:
 {
   "tool": "query",
   "arguments": {
-    "operation": "tags",
+    "type": "tags",
     "repository": "e-commerce-api",
     "tagId": "tag-backend"
   }
@@ -225,7 +225,7 @@ Claude creates each component:
 {
   "tool": "query",
   "arguments": {
-    "operation": "governance",
+    "type": "governance",
     "repository": "e-commerce-api",
     "componentId": "payment-service"
   }
@@ -246,8 +246,7 @@ Claude creates each component:
     "repository": "e-commerce-api",
     "agent": "claude",
     "summary": "Discussed implementing rate limiting for the API gateway",
-    "observation": "User wants to limit to 100 requests per minute per user",
-    "relatedComponents": ["api-gateway"]
+    "observation": "User wants to limit to 100 requests per minute per user"
   }
 }
 ```
@@ -260,7 +259,7 @@ Claude creates each component:
 {
   "tool": "query",
   "arguments": {
-    "operation": "history",
+    "type": "history",
     "repository": "e-commerce-api",
     "componentId": "api-gateway"
   }
@@ -277,9 +276,8 @@ Claude creates each component:
 {
   "tool": "analyze",
   "arguments": {
-    "operation": "pagerank",
-    "repository": "e-commerce-api",
-    "limit": 5
+    "type": "pagerank",
+    "repository": "e-commerce-api"
   }
 }
 ```
@@ -292,7 +290,7 @@ Claude creates each component:
 {
   "tool": "detect",
   "arguments": {
-    "operation": "cycles",
+    "type": "cycles",
     "repository": "e-commerce-api"
   }
 }
@@ -306,7 +304,7 @@ Claude creates each component:
 {
   "tool": "detect",
   "arguments": {
-    "operation": "islands",
+    "type": "islands",
     "repository": "e-commerce-api"
   }
 }
@@ -354,7 +352,8 @@ Claude creates each component:
   "arguments": {
     "operation": "optimize",
     "repository": "e-commerce-api",
-    "strategy": "balanced"
+    "strategy": "balanced",
+    "confirm": true
   }
 }
 ```
@@ -369,7 +368,7 @@ Claude creates each component:
 {
   "tool": "search",
   "arguments": {
-    "operation": "fulltext",
+    "mode": "fulltext",
     "repository": "e-commerce-api",
     "query": "authentication",
     "limit": 20
@@ -404,7 +403,7 @@ Claude creates each component:
   "tool": "entity",
   "arguments": {
     "operation": "update",
-    "type": "component",
+    "entityType": "component",
     "repository": "e-commerce-api",
     "id": "old-payment-gateway",
     "data": {

@@ -135,13 +135,18 @@ class DreamService:
         )
         model = get_model_name()
         if hasattr(llm_client, "chat"):  # openai-style
+            # No `temperature`. It was 0.2, unconditionally, and a reasoning
+            # model rejects any value but its own with "unsupported value" --
+            # so distilling raised for every user who had configured one. There
+            # is no temperature setting in this package to send, and inventing
+            # one would be inventing an answer to a question the operator was
+            # never asked: the model's own default is the right one.
             resp = llm_client.chat.completions.create(
                 model=model,
                 messages=[
                     {"role": "system", "content": DREAM_DISTILLER_PROMPT},
                     {"role": "user", "content": prompt},
                 ],
-                temperature=0.2,
             )
             text = resp.choices[0].message.content
         elif hasattr(llm_client, "messages"):  # anthropic-style

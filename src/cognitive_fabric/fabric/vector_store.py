@@ -1,16 +1,35 @@
 """Vector store for the Cognitive Fabric semantic layer.
 
 Backed by LanceDB (mutable tables, so it sidesteps KuzuDB's immutable vector
-index limitation). Embeddings are produced by OpenAI when OPENAI_API_KEY is set,
-otherwise by a local sentence-transformers model (no API key required).
+index limitation).
+
+The embedding backend is the one named in configuration
+(`fabric_embedding_provider`), not whichever library happens to find a key in
+the environment. It used to be the latter -- OpenAI if `OPENAI_API_KEY` was set,
+otherwise a local model -- which meant exporting a key silently moved every new
+vector into a different embedding space, at a different price, with the same
+table on the other side. A cloud backend also requires a model to be named: an
+embedding model fixes a price and a vector width, and vectors from two models
+are not comparable, so there is no default to fall back to. The local backends
+keep their own.
 
 Symbols from every repository/branch live in a single `symbols` table with
 `repository`/`branch` columns; queries pre-filter on those, keeping projects
-isolated within one store. lancedb / sentence-transformers are imported lazily.
+isolated within one store. lancedb and the embedding backends are imported
+lazily.
 """
 
 import os
 from typing import Any, Callable, Optional
+
+from cognitive_fabric.config import Settings
+from cognitive_fabric.config import settings as default_settings
+
+# The local backends' own default models, named here rather than left to the
+# library so that a backend upgrade cannot silently change the vectors this
+# store has already written. Both are local: no vendor, no price, no key.
+_FASTEMBED_DEFAULT_MODEL = "BAAI/bge-small-en-v1.5"
+_SENTENCE_TRANSFORMERS_DEFAULT_MODEL = "all-MiniLM-L6-v2"
 
 
 def _escape(value: str) -> str:
@@ -25,10 +44,25 @@ class VectorStore:
         self,
         data_dir: Optional[str] = None,
         embedder: Optional[Callable[[list[str]], list[list[float]]]] = None,
+        settings: Optional[Settings] = None,
     ) -> None:
+        """Initialize the vector store.
+
+        Args:
+            data_dir: Where the LanceDB database lives. Defaults to the
+                configured `fabric_data_dir`.
+            embedder: Optional injected embedder, for testing or a custom
+                backend. When given, no backend is resolved at all.
+            settings: Settings to read. Defaults to the process-wide settings.
+
+        Raises:
+            ValueError: if the configured cloud backend has no model named, or
+                a configured backend's library is not installed.
+        """
         import lancedb  # lazy: optional dependency
 
-        self._data_dir = data_dir or os.environ.get("FABRIC_DATA_DIR", "./.fabric_data")
+        settings = settings or default_settings
+        self._data_dir = data_dir or settings.fabric_data_dir or "./.fabric_data"
         db_path = os.path.join(self._data_dir, "lancedb")
         os.makedirs(db_path, exist_ok=True)
         self._db = lancedb.connect(db_path)
@@ -38,46 +72,72 @@ class VectorStore:
         self._openai = None
         self._fastembed = None
         self._st_model = None
+        self._backend = (
+            "custom" if embedder is not None else settings.fabric_embedding_provider
+        )
+        self._embed_model = ""
 
         if embedder is None:
-            # Resolve an embedding backend eagerly so misconfiguration fails fast.
-            # Preference: OpenAI (if key set) -> fastembed (local, pure ONNX, no
-            # torch) -> sentence-transformers (optional, requires torch).
-            if os.environ.get("OPENAI_API_KEY"):
-                try:
-                    from openai import OpenAI
+            self._resolve_backend(settings)
 
-                    self._openai = OpenAI()
-                    self._embed_model = os.environ.get(
-                        "FABRIC_EMBED_MODEL", "text-embedding-3-small"
-                    )
-                except Exception:
-                    self._openai = None
-            if self._openai is None:
-                try:
-                    from fastembed import TextEmbedding
+    def _resolve_backend(self, settings: Settings) -> None:
+        """Build the one backend that configuration names.
 
-                    self._embed_model = os.environ.get(
-                        "FABRIC_EMBED_MODEL", "BAAI/bge-small-en-v1.5"
-                    )
-                    self._fastembed = TextEmbedding(self._embed_model)
-                except Exception:
-                    from sentence_transformers import SentenceTransformer
+        Resolved in `__init__` rather than on first use, so that a
+        misconfiguration fails where the store is created. An unimportable
+        backend is an error, not a reason to quietly switch to another one: the
+        rows already in the table were written by a particular model, and
+        answering a query with a different one returns plausible nonsense.
+        """
+        provider = settings.fabric_embedding_provider
+        model = settings.fabric_embedding_model
 
-                    self._embed_model = os.environ.get(
-                        "FABRIC_EMBED_MODEL", "all-MiniLM-L6-v2"
-                    )
-                    self._st_model = SentenceTransformer(self._embed_model)
+        if provider == "openai":
+            if not model:
+                raise ValueError(
+                    "the openai embedding backend has no default model. An "
+                    "embedding model fixes both the price per million tokens "
+                    "and the width of every vector already in the table, and "
+                    "vectors from two models are not comparable, so this must "
+                    "be a choice rather than a fallback. Set "
+                    "COGNITIVE_FABRIC_FABRIC_EMBEDDING_MODEL to a model id from "
+                    "https://platform.openai.com/docs/guides/embeddings."
+                )
+            try:
+                from openai import OpenAI
+            except Exception as e:
+                raise ValueError(
+                    f"the openai embedding backend is not installed: {e}. The "
+                    "SDK is in the 'cloud' extra: pip install "
+                    "'cognitive-fabric[cloud]'"
+                ) from e
+            self._openai = OpenAI()
+            self._embed_model = model
+            return
+
+        if provider == "fastembed":
+            self._embed_model = model or _FASTEMBED_DEFAULT_MODEL
+            try:
+                from fastembed import TextEmbedding
+            except Exception as e:
+                raise ValueError(
+                    f"the fastembed embedding backend is not installed: {e}"
+                ) from e
+            self._fastembed = TextEmbedding(self._embed_model)
+            return
+
+        self._embed_model = model or _SENTENCE_TRANSFORMERS_DEFAULT_MODEL
+        try:
+            from sentence_transformers import SentenceTransformer
+        except Exception as e:
+            raise ValueError(
+                f"the sentence-transformers embedding backend is not installed: {e}"
+            ) from e
+        self._st_model = SentenceTransformer(self._embed_model)
 
     @property
     def backend(self) -> str:
-        if self._embedder is not None:
-            return "custom"
-        if self._openai is not None:
-            return "openai"
-        if self._fastembed is not None:
-            return "fastembed"
-        return "sentence-transformers"
+        return self._backend
 
     def _embed(self, texts: list[str]) -> list[list[float]]:
         if not texts:

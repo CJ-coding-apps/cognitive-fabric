@@ -264,3 +264,220 @@ class TestOptimizerParity:
         assert sample["entities"] == []
         assert sample["relationships"] == []
         assert sample["metadata"]["totalEntities"] == 0
+
+
+@pytest.mark.integration
+class TestOperatorDeletionCap:
+    """The cap has to hold where the deletes happen, not where the plan is drawn.
+
+    `settings.optimizer_max_deletions` is the operator's ceiling. It is set on
+    the module-level settings object rather than through the environment,
+    because `config.settings` is built at import and a `setenv` would not reach
+    it.
+    """
+
+    @pytest_asyncio.fixture
+    async def call(self, memory_service: MemoryService):
+        registry = ToolRegistry()
+        ctx = ToolHandlerContext()
+
+        async def _call(name, params):
+            return await registry.call_tool(name, params, ctx, memory_service)
+
+        return _call
+
+    async def _seed(self, call, deprecated: int) -> None:
+        """Init the bank and seed `deprecated` deprecated components."""
+        await call(
+            "memory-bank",
+            {
+                "operation": "init",
+                "repository": REPO,
+                "branch": BRANCH,
+                "clientProjectRoot": "/tmp/opt-cap",
+            },
+        )
+        for i in range(deprecated):
+            await call(
+                "entity",
+                {
+                    "operation": "create",
+                    "entityType": "component",
+                    "repository": REPO,
+                    "branch": BRANCH,
+                    "data": {
+                        "id": f"cap-comp-{i}",
+                        "name": f"CapComp{i}",
+                        "kind": "service",
+                        "status": "deprecated",
+                    },
+                },
+            )
+
+    @pytest.mark.asyncio
+    async def test_the_cap_holds_under_aggressive(self, call, monkeypatch):
+        """Five deprecated components, a cap of two, `aggressive`: two go.
+
+        `aggressive`'s own preset is 100, so nothing but the operator's cap can
+        produce the 2 here -- which is the point. A cap that a high strategy
+        can lift is not a cap.
+        """
+        from cognitive_fabric.config import settings as cf_settings
+
+        monkeypatch.setattr(cf_settings, "optimizer_max_deletions", 2)
+        await self._seed(call, deprecated=5)
+
+        result = await call(
+            "memory-optimizer",
+            {
+                "operation": "optimize",
+                "repository": REPO,
+                "branch": BRANCH,
+                "dryRun": False,
+                "confirm": True,
+                "strategy": "aggressive",
+            },
+        )
+        assert result.get("success") is True
+        assert result.get("max_deletions") == 2
+        assert result.get("action_count") == 2
+
+        # And the other three are still there: the cap bounded the work, it did
+        # not merely describe it.
+        remaining = 0
+        for i in range(5):
+            got = await call(
+                "entity",
+                {
+                    "operation": "get",
+                    "entityType": "component",
+                    "repository": REPO,
+                    "branch": BRANCH,
+                    "id": f"cap-comp-{i}",
+                },
+            )
+            if got.get("success") is True:
+                remaining += 1
+        assert remaining == 3
+
+    @pytest.mark.asyncio
+    async def test_unset_means_the_strategys_own_limit(self, call, monkeypatch):
+        """With no operator cap, each strategy runs to its own preset limit.
+
+        An unset cap must not read as a limit of zero -- nothing would ever be
+        deleted -- nor as unbounded. All three presets are checked, because a
+        hardcoded number would satisfy `aggressive` by coincidence.
+        """
+        from cognitive_fabric.agents.memory_optimizer.context_builder import (
+            STRATEGY_CONFIGS,
+        )
+        from cognitive_fabric.config import settings as cf_settings
+
+        monkeypatch.setattr(cf_settings, "optimizer_max_deletions", None)
+        await self._seed(call, deprecated=1)
+
+        limits = {name: cfg["max_deletions"] for name, cfg in STRATEGY_CONFIGS.items()}
+        assert len(set(limits.values())) == len(limits), "presets must be distinct"
+
+        for strategy, preset in limits.items():
+            result = await call(
+                "memory-optimizer",
+                {
+                    "operation": "optimize",
+                    "repository": REPO,
+                    "branch": BRANCH,
+                    "dryRun": True,
+                    "strategy": strategy,
+                },
+            )
+            assert result.get("max_deletions") == preset, strategy
+
+    @pytest.mark.asyncio
+    async def test_the_caller_cannot_lift_the_cap(self, call, monkeypatch):
+        """A `maxDeletions` larger than the operator's cap is still the cap."""
+        from cognitive_fabric.config import settings as cf_settings
+
+        monkeypatch.setattr(cf_settings, "optimizer_max_deletions", 2)
+        await self._seed(call, deprecated=1)
+
+        result = await call(
+            "memory-optimizer",
+            {
+                "operation": "optimize",
+                "repository": REPO,
+                "branch": BRANCH,
+                "dryRun": True,
+                "strategy": "aggressive",
+                "maxDeletions": 500,
+            },
+        )
+        assert result.get("max_deletions") == 2
+
+
+@pytest.mark.integration
+class TestAnUnknownStrategyName:
+    """The schema's enum is documentation; the handler is what refuses.
+
+    `mcp/server.py` passes tool arguments straight to the handler, so a name
+    the schema does not list still arrives. It used to resolve to `balanced` and
+    delete up to fifty entities under a strategy nobody asked for.
+    """
+
+    @pytest_asyncio.fixture
+    async def call(self, memory_service: MemoryService):
+        registry = ToolRegistry()
+        ctx = ToolHandlerContext()
+
+        async def _call(name, params):
+            return await registry.call_tool(name, params, ctx, memory_service)
+
+        return _call
+
+    @pytest.mark.asyncio
+    async def test_it_is_refused_before_anything_is_deleted(
+        self, call, memory_service: MemoryService, temp_dir: Path
+    ):
+        await call(
+            "memory-bank",
+            {
+                "operation": "init",
+                "repository": REPO,
+                "branch": BRANCH,
+                "clientProjectRoot": str(temp_dir),
+            },
+        )
+        for i in range(3):
+            await call(
+                "entity",
+                {
+                    "operation": "create",
+                    "entityType": "component",
+                    "repository": REPO,
+                    "branch": BRANCH,
+                    "data": {
+                        "id": f"typo-comp-{i}",
+                        "name": f"TypoComp{i}",
+                        "kind": "service",
+                        "status": "deprecated",
+                    },
+                },
+            )
+
+        client = await memory_service.get_kuzu_client()
+        before = client.count("MATCH (c:Component) RETURN count(c)")
+
+        result = await call(
+            "memory-optimizer",
+            {
+                "operation": "optimize",
+                "repository": REPO,
+                "branch": BRANCH,
+                "dryRun": False,
+                "confirm": True,
+                "strategy": "louvain-typo",
+            },
+        )
+
+        assert result.get("success") is False, result
+        assert "louvain-typo" in result.get("error", ""), result
+        assert client.count("MATCH (c:Component) RETURN count(c)") == before

@@ -6,12 +6,32 @@ on:
     branches:
       - main
       - master
+  # Deliberately no branch filter. With `branches: [main, master]` here, a pull
+  # request whose base is any other branch -- which is how a change is stacked on
+  # another unmerged change -- got no CI at all, and "no checks reported" in the
+  # PR list reads much like "checks passed". Every pull request runs CI.
   pull_request:
-    branches:
-      - main
-      - master
 
 jobs:
+  # The workflow files are the one thing here with no other gate, and release.yml
+  # is the part that runs rarely and matters most -- so a mistake in it is found
+  # at release time, by everyone. actionlint reads the workflows themselves:
+  # expression syntax, job-graph references, and the shell and Python inside each
+  # `run:` block, through shellcheck and pyflakes, both of which the pinned image
+  # below ships. Run against this tree it reported two SC2086 findings in
+  # release.yml (`>> $GITHUB_OUTPUT` unquoted); both are fixed.
+  actionlint:
+    name: Lint workflows
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run actionlint
+        uses: docker://rhysd/actionlint:1.7.12
+        with:
+          args: -color
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -27,8 +47,15 @@ jobs:
       - name: Install dependencies
         run: pip install -e '.[dev]'
 
+      # `scripts/` is included, not just `src/` and `tests/`. The smoke script is
+      # not part of the package but it is part of this repository, and code no
+      # gate reads is code that rots. This used to name that one file because
+      # scripts/start_server.py did not pass -- it imported `kuzumempy.main`,
+      # which does not exist; the tool-surface freeze fixed it to
+      # `cognitive_fabric.main`. Its remaining E402 is a deliberate path insert,
+      # marked as such.
       - name: Run Ruff linter
-        run: ruff check src tests
+        run: ruff check src tests scripts
 
       # mypy is deliberately not a gate here yet. It is configured
       # (`strict = true` in pyproject.toml) but the tree does not satisfy it:
@@ -38,9 +65,33 @@ jobs:
       # missing. The command will be `mypy src`.
 
   test:
-    name: Test
+    name: Test (py${{ matrix.python-version }}, ${{ matrix.profile.name }})
     runs-on: ubuntu-latest
     needs: lint
+    strategy:
+      # Report every combination, rather than cancelling the others when one
+      # fails.
+      fail-fast: false
+      matrix:
+        # Every version the package installs on, and nothing beyond them. 3.14 is
+        # excluded by `requires-python`, because kuzu 0.11.3 ships no cp314 wheels
+        # for macOS or Windows; the comment there has the detail.
+        python-version: ['3.11', '3.12', '3.13']
+        # Two installs, because the failure worth catching here is not a red
+        # test -- it is a green run in which the optional half never ran. The
+        # vector-store suite is `pytest.importorskip("lancedb")` at module level,
+        # so under the minimal install it collapses to a single module skip and
+        # its four tests do not exist; the full install is where they run. The
+        # minimal install is where the *degraded* path -- semantic search
+        # reporting itself unavailable rather than raising -- is the only thing
+        # that can run, and so must. That pairing has to hold on both Python
+        # versions, because a green minimal run is exactly what a broken install
+        # of the full one looks like.
+        profile:
+          - name: minimal
+            extras: dev
+          - name: full
+            extras: dev,cloud,semantic
 
     steps:
       - name: Checkout repository
@@ -49,16 +100,173 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python-version }}
 
+      # Every extra is installed somewhere here. An extra that does not resolve
+      # is a broken install for every user who asks for it, and nothing else in
+      # CI would notice. `cloud` is in the full profile only; no test imports
+      # either SDK (the LLM tests use duck-typed fakes), so it is installed to
+      # prove it installs, not to cover a hidden skip.
+      #
+      # `full` downloads fastembed's ONNX model on the first vector-store test,
+      # which is the price of the four tests actually running rather than
+      # skipping. It happens once per job.
       - name: Install dependencies
-        run: pip install -e '.[dev]'
+        run: pip install -e '.[${{ matrix.profile.extras }}]'
 
-      # Tests needing the optional [semantic] stack (LanceDB) skip themselves
-      # when it is absent, which is the documented behaviour — they are not
-      # silently passing.
+      # `-rs` is not decoration. Without it a module-level skip leaves no line at
+      # all in the `-v` output, so "the vector-store tests skipped" and "the
+      # vector-store tests were never mentioned" read identically -- which is the
+      # whole defect this job pair exists for. The short summary is what names the
+      # reason, and the check below reads it.
       - name: Run tests
-        run: pytest tests/unit/ tests/integration/ tests/e2e/ -v --tb=short
+        env:
+          PROFILE: ${{ matrix.profile.name }}
+        run: |
+          set +e
+          pytest tests/unit/ tests/integration/ tests/e2e/ -v --tb=short -rs \
+            > /tmp/pytest.log 2>&1
+          PYTEST_RC=$?
+          set -e
+          cat /tmp/pytest.log
+          export PYTEST_RC
+          python3 - <<'PY'
+          import os
+          import pathlib
+          import re
+          import sys
+
+          rc = int(os.environ["PYTEST_RC"])
+          log = pathlib.Path("/tmp/pytest.log").read_text()
+
+          # A red run is its own message, and it is printed above.
+          if rc != 0:
+              sys.exit(rc)
+
+          profile = os.environ["PROFILE"]
+
+          # One line per test that actually ran, so this counts tests executed --
+          # not tests collected, and not "no failures".
+          ran = re.findall(
+              r"^tests/integration/test_vector_store\.py::\S+ PASSED", log, re.M
+          )
+          degraded = (
+              "TestTheDegradedSemanticPath::"
+              "test_semantic_search_reports_itself_unavailable PASSED"
+          )
+
+          if profile == "full":
+              # `full` installs the [semantic] extra, so the four tests are the
+              # point of the profile; anything fewer means part of them skipped.
+              if len(ran) != 4:
+                  sys.exit(
+                      f"the full profile installs [semantic], so all four "
+                      f"vector-store tests must run; {len(ran)} did: {ran}"
+                  )
+              print(f"full profile: {len(ran)}/4 vector-store tests ran")
+          else:
+              # `minimal` has no [semantic] extra: the module must have skipped,
+              # and the degraded path must have been asserted. A profile that
+              # merely skipped things has proved nothing.
+              if ran:
+                  sys.exit(
+                      f"the minimal profile does not install [semantic], so "
+                      f"test_vector_store.py must not run, but {len(ran)} of its "
+                      f"tests did: {ran}"
+                  )
+              if "SKIPPED [1] tests/integration/test_vector_store.py:" not in log:
+                  sys.exit(
+                      "the vector-store module did not report itself skipped, so "
+                      "nothing here says the missing extra is what is missing"
+                  )
+              if degraded not in log:
+                  sys.exit(
+                      "semantic search was never asserted to degrade, in the one "
+                      "profile where it is unavailable"
+                  )
+              print("minimal profile: vector store skipped; degraded path asserted")
+          PY
+
+  docker:
+    # Builds the image but never publishes it. CF ships a Dockerfile and a
+    # docker-compose.yml, and until this job existed nothing had ever built
+    # either -- so a broken image would have been found by whoever tried it
+    # first, after release, rather than here.
+    name: Docker (production image)
+    runs-on: ubuntu-latest
+    needs: lint
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build the production image
+        run: docker build --file Dockerfile --tag cognitive-fabric:ci .
+
+      - name: Handshake over stdio
+        # Initialise, then let stdin close. This does need the database path the
+        # Dockerfile sets: the server builds its MemoryService during startup and
+        # exits without one, so it cannot answer `initialize` pathless. No key
+        # and no network are needed, which is still the point of checking here.
+        #
+        # stdout carries the JSON-RPC stream, so anything the server logs has to
+        # go to stderr. It does -- PrintLoggerFactory(file=sys.stderr) in
+        # utils/logger.py -- and the assertion below fails rather than skips if
+        # that ever stops being true.
+        run: |
+          printf '%s\n' \
+            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ci-handshake","version":"0"}}}' \
+            | timeout 300 docker run -i --rm cognitive-fabric:ci \
+                > /tmp/handshake.jsonl 2> /tmp/handshake.err \
+            || echo "docker run exit: $?"
+          echo "--- container stderr (tail) ---"
+          tail -20 /tmp/handshake.err || true
+
+      - name: Assert the handshake
+        run: |
+          python3 - <<'PY'
+          import json, pathlib, sys
+
+          # Both pinned deliberately: the version this repo publishes, and the
+          # name a client sees. Without an explicit `version=` the MCP SDK falls
+          # back to the *mcp package's* version, which is how the handshake once
+          # advertised 1.30.0 for a 0.1.0 server.
+          EXPECTED_VERSION = "0.1.0"
+          EXPECTED_NAME = "cognitive-fabric"
+
+          raw = pathlib.Path("/tmp/handshake.jsonl").read_text()
+
+          # stdout carries the JSON-RPC stream and nothing else. A stray log line
+          # here corrupts the protocol, so it fails rather than being skipped.
+          messages = []
+          for n, line in enumerate(raw.splitlines(), 1):
+              if not line.strip():
+                  continue
+              try:
+                  messages.append(json.loads(line))
+              except json.JSONDecodeError as e:
+                  sys.exit(f"stdout line {n} is not JSON: {line[:160]!r} ({e})")
+
+          infos = [
+              m["result"]["serverInfo"]
+              for m in messages
+              if isinstance(m.get("result"), dict) and "serverInfo" in m["result"]
+          ]
+          if not infos:
+              sys.exit(f"no serverInfo in {len(messages)} message(s): {messages!r}")
+
+          info = infos[0]
+          if info.get("name") != EXPECTED_NAME:
+              sys.exit(f"serverInfo.name is {info.get('name')!r}, expected {EXPECTED_NAME!r}")
+          if info.get("version") != EXPECTED_VERSION:
+              sys.exit(
+                  f"serverInfo.version is {info.get('version')!r}, "
+                  f"expected {EXPECTED_VERSION!r}"
+              )
+
+          print(f"stdout: {len(messages)} JSON-RPC message(s), 0 stray lines")
+          print(f"serverInfo: {info}")
+          PY
 
   test-summary:
     name: Test Summary

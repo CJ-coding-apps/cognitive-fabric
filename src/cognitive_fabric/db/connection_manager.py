@@ -65,7 +65,16 @@ class ConnectionManager:
         """Disconnect from the database."""
         if self._connection is not None:
             self._logger.info("Disconnecting from database")
-            # Kuzu connections are closed automatically when garbage collected
+            # Close explicitly rather than dropping the references and leaving
+            # it to the garbage collector. The query executor and schema
+            # manager hold the same connection, and the client only releases
+            # them *after* this returns -- so the file stayed open past the
+            # point the caller was told the client was closed, and a caller
+            # that then replaced the database file was writing over a file the
+            # database still had open.
+            self._connection.close()
+            if self._database is not None:
+                self._database.close()
             self._connection = None
             self._database = None
             self._logger.info("Disconnected from database")

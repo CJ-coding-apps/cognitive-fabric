@@ -7,8 +7,10 @@ import structlog
 
 from cognitive_fabric.agents.memory_optimizer.context_builder import (
     MemoryContextBuilder,
+    effective_max_deletions,
 )
 from cognitive_fabric.agents.memory_optimizer.prompt_manager import PromptManager
+from cognitive_fabric.config import settings as default_settings
 from cognitive_fabric.services.memory_service import MemoryService
 from cognitive_fabric.types.optimization import (
     AgentOptimizationAction as OptimizationAction,
@@ -47,22 +49,29 @@ class OptimizationPlanService:
         self,
         repository: str,
         branch: str = "main",
-        strategy: OptimizationStrategy = OptimizationStrategy.BALANCED,
+        strategy: Optional[OptimizationStrategy] = None,
         use_llm: bool = False,
         llm_client: Optional[Any] = None,
+        model_name: Optional[str] = None,
     ) -> OptimizationPlan:
         """Create an optimization plan.
 
         Args:
             repository: The repository name.
             branch: The branch name.
-            strategy: The optimization strategy.
+            strategy: The optimization strategy. Unset means the configured
+                default, COGNITIVE_FABRIC_OPTIMIZER_DEFAULT_STRATEGY.
             use_llm: Whether to use LLM for planning.
             llm_client: Optional LLM client.
+            model_name: The model to ask for. Comes from configuration, via the
+                agent; this service chooses no model of its own.
 
         Returns:
             The optimization plan.
         """
+        strategy = strategy or OptimizationStrategy(
+            default_settings.optimizer_default_strategy
+        )
         logger.info(
             "Creating optimization plan",
             repository=repository,
@@ -80,15 +89,13 @@ class OptimizationPlanService:
 
         # Optionally enhance with LLM
         if use_llm and llm_client:
-            llm_plan = await self._create_llm_plan(context, llm_client)
+            llm_plan = await self._create_llm_plan(context, llm_client, model_name)
             if llm_plan and llm_plan.get("actions"):
                 # Merge LLM actions with rule-based actions
                 actions = self._merge_plans(actions, llm_plan.get("actions", []))
 
         # Apply strategy limits
-        actions = self._apply_strategy_limits(
-            actions, context.get("strategy_config", {})
-        )
+        actions = self._apply_strategy_limits(actions, strategy)
 
         plan_id = str(uuid.uuid4())
 
@@ -178,12 +185,14 @@ class OptimizationPlanService:
         self,
         context: Dict[str, Any],
         llm_client: Any,
+        model_name: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Create an LLM-enhanced optimization plan.
 
         Args:
             context: The optimization context.
             llm_client: The LLM client.
+            model_name: The model to ask for, from configuration.
 
         Returns:
             LLM plan dictionary.
@@ -195,18 +204,17 @@ class OptimizationPlanService:
             # Call LLM
             if hasattr(llm_client, "chat"):
                 response = await llm_client.chat.completions.create(
-                    model="gpt-4o-mini",
+                    model=model_name,
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": prompt},
                     ],
-                    temperature=0.3,
                 )
                 response_text = response.choices[0].message.content
 
             elif hasattr(llm_client, "messages"):
                 response = await llm_client.messages.create(
-                    model="claude-3-haiku-20240307",
+                    model=model_name,
                     max_tokens=2000,
                     system=system_prompt,
                     messages=[{"role": "user", "content": prompt}],
@@ -259,25 +267,37 @@ class OptimizationPlanService:
     def _apply_strategy_limits(
         self,
         actions: List[OptimizationAction],
-        strategy_config: Dict[str, Any],
+        strategy: str,
     ) -> List[OptimizationAction]:
-        """Apply strategy limits to actions.
+        """Apply the deletion limit to a plan's actions.
+
+        The limit caps deletions, and only deletions. It used to truncate the
+        whole action list, so a plan of 30 low-risk status updates and 3
+        deletions came out as 10 updates and no deletions under `conservative`
+        -- a deletion limit that removed work it was not about, and reported a
+        plan smaller than the memory actually needed.
 
         Args:
             actions: The list of actions.
-            strategy_config: The strategy configuration.
+            strategy: The strategy name, which selects the preset limit.
 
         Returns:
-            Limited list of actions.
+            The actions, with the lowest-risk deletions beyond the limit dropped.
         """
-        max_deletions = strategy_config.get("max_deletions", 50)
+        max_deletions = effective_max_deletions(
+            strategy, operator_cap=default_settings.optimizer_max_deletions
+        )
 
         # Sort by risk level (low first)
         risk_order = {"low": 0, "medium": 1, "high": 2}
-        sorted_actions = sorted(
-            actions,
-            key=lambda a: risk_order.get(a.risk_level, 2),
-        )
+        ordered = sorted(actions, key=lambda a: risk_order.get(a.risk_level, 2))
 
-        # Apply limit
-        return sorted_actions[:max_deletions]
+        kept: List[OptimizationAction] = []
+        deletions_kept = 0
+        for action in ordered:
+            if action.action_type == "delete":
+                if deletions_kept >= max_deletions:
+                    continue
+                deletions_kept += 1
+            kept.append(action)
+        return kept

@@ -9,6 +9,7 @@ from typing import AsyncGenerator, Generator
 import pytest
 import pytest_asyncio
 
+from cognitive_fabric import config
 from cognitive_fabric.config import Settings
 from cognitive_fabric.db.kuzu_client import KuzuDBClient
 from cognitive_fabric.services.memory_service import MemoryService
@@ -32,9 +33,24 @@ def temp_dir() -> Generator[Path, None, None]:
 
 @pytest.fixture(autouse=True)
 def _isolate_fabric_data(tmp_path, monkeypatch):
-    """Isolate the LanceDB vector store per test (avoids cross-test leakage via
-    the default cwd-relative ./.fabric_data), and keep the repo clean."""
-    monkeypatch.setenv("FABRIC_DATA_DIR", str(tmp_path / "fabric_data"))
+    """Point the LanceDB vector store at a per-test directory.
+
+    Without this it lands in the cwd-relative `./.fabric_data`, which is one
+    directory shared by every test *and* every run: a test that indexes
+    something leaves it in the working tree, and the next run reads it back.
+    That is how an assertion like "this repository has nothing ingested" starts
+    failing on a hit from an earlier test. It also keeps the repo clean.
+
+    Patched on the `Settings` singleton, not through the environment:
+    `cognitive_fabric.config` builds that singleton at import time, so a
+    `monkeypatch.setenv` here would land after its only reader had already read.
+    The variable this used to set, `FABRIC_DATA_DIR`, was a second name for the
+    same setting and is gone -- `COGNITIVE_FABRIC_FABRIC_DATA_DIR` is the name
+    `Settings.fabric_data_dir` actually derives from.
+    """
+    monkeypatch.setattr(
+        config.settings, "fabric_data_dir", str(tmp_path / "fabric_data")
+    )
     yield
 
 

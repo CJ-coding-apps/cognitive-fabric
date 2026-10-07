@@ -14,8 +14,8 @@ This guide covers development setup, coding standards, and contribution guidelin
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-repo/cognitive_fabric-mcp.git
-cd cognitive_fabric-mcp
+git clone https://github.com/CJ-coding-apps/cognitive-fabric.git
+cd cognitive-fabric
 
 # Build the development container
 docker compose build
@@ -38,7 +38,7 @@ pip install -e ".[dev]"
 ## Project Structure
 
 ```
-cognitive_fabric-mcp/
+cognitive-fabric/
 ├── src/cognitive_fabric/           # Main source code
 │   ├── agents/              # AI agents
 │   │   └── memory_optimizer/
@@ -429,7 +429,7 @@ Common fixtures are defined in `tests/conftest.py`:
 ### Debug Logging
 
 ```bash
-COGNITIVE_FABRIC_LOG_LEVEL=DEBUG cognitive_fabric serve
+COGNITIVE_FABRIC_LOG_LEVEL=DEBUG cognitive-fabric serve
 ```
 
 ### Interactive Debugging

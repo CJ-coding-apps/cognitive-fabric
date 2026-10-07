@@ -55,10 +55,10 @@ cognitive-fabric fabric-ingest ./data/mem.db my-app --path /path/to/project
 ```
 
 ```json
-{ "tool": "fabric", "operation": "ingest-ast", "repository": "my-app", "path": "/path/to/project" }
-{ "tool": "fabric", "operation": "query-rationale", "repository": "my-app", "itemId": "src/auth.py:login" }
-{ "tool": "fabric", "operation": "dream", "repository": "my-app" }
-{ "tool": "search", "searchType": "semantic", "repository": "my-app", "query": "authentication" }
+{ "tool": "fabric", "arguments": { "operation": "ingest-ast", "repository": "my-app", "path": "/path/to/project" } }
+{ "tool": "fabric", "arguments": { "operation": "query-rationale", "repository": "my-app", "itemId": "src/auth.py:login" } }
+{ "tool": "fabric", "arguments": { "operation": "dream", "repository": "my-app" } }
+{ "tool": "search", "arguments": { "searchType": "semantic", "repository": "my-app", "query": "authentication" } }
 ```
 
 ## Security

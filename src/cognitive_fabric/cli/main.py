@@ -8,12 +8,13 @@ from typing import Optional
 
 import click
 
+from cognitive_fabric import __version__
 from cognitive_fabric.config import Settings
 from cognitive_fabric.utils.logger import configure_logging
 
 
 @click.group()
-@click.version_option(version="1.0.0", prog_name="cognitive_fabric")
+@click.version_option(version=__version__, prog_name="cognitive_fabric")
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
 @click.pass_context
 def cli(ctx: click.Context, verbose: bool) -> None:
@@ -35,13 +36,13 @@ def cli(ctx: click.Context, verbose: bool) -> None:
     "--log-level",
     "-l",
     type=click.Choice(["DEBUG", "INFO", "WARNING", "ERROR"]),
-    default="INFO",
-    help="Logging level",
+    default=None,
+    help="Logging level. Unset means COGNITIVE_FABRIC_LOG_LEVEL.",
 )
 @click.option(
-    "--json-logs",
-    is_flag=True,
-    help="Output logs in JSON format",
+    "--json-logs/--no-json-logs",
+    default=None,
+    help="JSON or plain-text logs. Unset means COGNITIVE_FABRIC_LOG_JSON.",
 )
 @click.option(
     "--transport",
@@ -65,8 +66,8 @@ def cli(ctx: click.Context, verbose: bool) -> None:
 def serve(
     ctx: click.Context,
     db_path: Optional[str],
-    log_level: str,
-    json_logs: bool,
+    log_level: Optional[str],
+    json_logs: Optional[bool],
     transport: str,
     host: Optional[str],
     port: Optional[int],
@@ -79,14 +80,21 @@ def serve(
     """
     from cognitive_fabric.mcp.server import run_http_server, run_server
 
-    # Reconfigure logging if needed
-    if json_logs or log_level != "INFO":
-        configure_logging(log_level=log_level, json_output=json_logs)
-
     # Build settings
     settings = Settings()
     if db_path:
-        settings.db_path_override = db_path
+        settings.db_path = db_path
+
+    # A flag wins over the environment, and the environment over this command's
+    # own default. Both options used to carry a value of their own -- "INFO" and
+    # an `is_flag` default of False -- so neither could tell "not given" from
+    # "given the default", and `COGNITIVE_FABRIC_LOG_LEVEL` and
+    # `COGNITIVE_FABRIC_LOG_JSON`, which the configuration guide documents, did
+    # not reach the server.
+    configure_logging(
+        log_level=log_level or settings.log_level,
+        json_output=settings.log_json if json_logs is None else json_logs,
+    )
 
     if ctx.obj.get("verbose"):
         click.echo(
@@ -200,8 +208,11 @@ def info(ctx: click.Context, db_path: str) -> None:
     "--strategy",
     "-s",
     type=click.Choice(["conservative", "balanced", "aggressive"]),
-    default="balanced",
-    help="Optimization strategy",
+    default=None,
+    help=(
+        "Optimization strategy. Defaults to "
+        "COGNITIVE_FABRIC_OPTIMIZER_DEFAULT_STRATEGY, which is conservative."
+    ),
 )
 @click.option(
     "--dry-run",
@@ -223,6 +234,7 @@ def optimize(
     on the selected strategy.
     """
     from cognitive_fabric.agents.memory_optimizer import MemoryOptimizationAgent
+    from cognitive_fabric.config import settings
     from cognitive_fabric.services.memory_service import MemoryService
     from cognitive_fabric.types.optimization import OptimizationStrategy
 
@@ -230,7 +242,14 @@ def optimize(
         memory_service = await MemoryService.get_instance(db_path)
         agent = MemoryOptimizationAgent(memory_service)
 
-        strategy_enum = OptimizationStrategy(strategy)
+        # Unset means the configured default rather than a number compiled into
+        # this command. It used to be a hardcoded `balanced`, which both made
+        # the CLI's default disagree with the documented and configured one
+        # (`conservative`) and meant COGNITIVE_FABRIC_OPTIMIZER_DEFAULT_STRATEGY
+        # had no effect on this path at all.
+        strategy_enum = OptimizationStrategy(
+            strategy or settings.optimizer_default_strategy
+        )
 
         if ctx.obj.get("verbose"):
             click.echo(f"Analyzing {repository}:{branch}...", err=True)
@@ -258,6 +277,10 @@ def optimize(
         click.echo(f"Actions Failed: {summary.get('actions_failed', 0)}")
         if summary.get("snapshot_id"):
             click.echo(f"Snapshot ID: {summary.get('snapshot_id')}")
+        if summary.get("error"):
+            click.echo("")
+            click.echo(f"Error: {summary['error']}", err=True)
+            sys.exit(1)
         if dry_run:
             click.echo("")
             click.echo("(Dry run - no changes made)")
@@ -307,7 +330,6 @@ def rollback(
 @click.argument("db_path", type=click.Path(exists=True))
 @click.argument("repository")
 @click.option("--branch", "-b", default="main", help="Branch name")
-@click.option("--limit", "-n", default=10, help="Maximum number of snapshots")
 @click.option("--json", "json_output", is_flag=True, help="Output as JSON")
 @click.pass_context
 def list_snapshots(
@@ -315,7 +337,6 @@ def list_snapshots(
     db_path: str,
     repository: str,
     branch: str,
-    limit: int,
     json_output: bool,
 ) -> None:
     """List available snapshots for a repository."""
@@ -326,7 +347,7 @@ def list_snapshots(
         memory_service = await MemoryService.get_instance(db_path)
         agent = MemoryOptimizationAgent(memory_service)
 
-        snapshots = await agent.list_snapshots(repository, branch, limit)
+        snapshots = await agent.list_snapshots(repository, branch)
 
         if json_output:
             click.echo(json.dumps(snapshots, indent=2, default=str))
