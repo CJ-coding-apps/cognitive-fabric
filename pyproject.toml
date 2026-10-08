@@ -44,6 +44,12 @@ dependencies = [
     "tree-sitter-language-pack>=0.9.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/CJ-coding-apps/cognitive-fabric"
+Repository = "https://github.com/CJ-coding-apps/cognitive-fabric"
+Issues = "https://github.com/CJ-coding-apps/cognitive-fabric/issues"
+Changelog = "https://github.com/CJ-coding-apps/cognitive-fabric/releases"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
