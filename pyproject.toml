@@ -22,6 +22,26 @@ license = "Apache-2.0"
 authors = [
     { name = "Jim Cuttler", email = "jimcuttler@gmail.com" }
 ]
+keywords = ["mcp", "model-context-protocol", "memory-bank", "knowledge-graph", "kuzu", "agent-memory", "claude-code"]
+# What PyPI's sidebar shows. The Python classifiers must list exactly the versions
+# `requires-python` admits and CI tests; widen them together or not at all. No
+# `License ::` classifier: `license` above is an SPDX expression (PEP 639), which
+# supersedes license classifiers, and hatchling refuses to build with both.
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Database",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development",
+]
 dependencies = [
     # Pinned exactly: kuzu is archived upstream (0.11.3 is the final release) and
     # its file format is not stable pre-1.0, so an unpinned upgrade can make an
@@ -48,7 +68,8 @@ dependencies = [
 Homepage = "https://github.com/CJ-coding-apps/cognitive-fabric"
 Repository = "https://github.com/CJ-coding-apps/cognitive-fabric"
 Issues = "https://github.com/CJ-coding-apps/cognitive-fabric/issues"
-Changelog = "https://github.com/CJ-coding-apps/cognitive-fabric/releases"
+Changelog = "https://github.com/CJ-coding-apps/cognitive-fabric/blob/main/CHANGELOG.md"
+Security = "https://github.com/CJ-coding-apps/cognitive-fabric/blob/main/docs/SECURITY.md"
 
 [project.optional-dependencies]
 dev = [

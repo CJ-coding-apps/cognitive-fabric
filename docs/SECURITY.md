@@ -44,6 +44,14 @@ Anything that breaks one of those statements — a database or vector store writ
 directory, a tool argument that reaches a path outside the project root, a request made with no provider
 configured — is a vulnerability, and we would want to hear about it.
 
+## The storage engine is archived upstream
+
+The graph lives in KùzuDB, pinned at 0.11.3. Kùzu is archived by its maintainers and 0.11.3 is its final
+release, so a vulnerability in Kùzu itself will not be fixed upstream. Report one anyway: the fix available
+here may be a mitigation in this server (refusing the input that triggers it), a documented limitation, or
+a change of storage engine — but it will be one of those, recorded in the changelog, rather than silence.
+The pin is exact because Kùzu's on-disk format is not stable before 1.0; see the README's status section.
+
 ## Out of scope
 
 Findings that depend on an attacker already running code as the user who runs the server; and the content

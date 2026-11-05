@@ -15,6 +15,27 @@ tree-sitter, embedding, and LLM work all run in-process.
 > KuzuMemPy-MCP port it grew from — was written by this project's author.
 > See `NOTICE`. Licensed under Apache-2.0 (`LICENSE`).
 
+## Status and support
+
+- **What it is.** An MCP server and a CLI: you run it, you don't import it. The
+  supported interfaces are the 13 MCP tools, the `cognitive-fabric` /
+  `cognitive-fabric-server` commands, and the settings under
+  [Configuration](https://github.com/CJ-coding-apps/cognitive-fabric#configuration). The Python modules behind them
+  (`cognitive_fabric.*`) are not a public API and change without notice.
+- **Versioning.** Pre-1.0 [SemVer](https://semver.org/): a minor release may
+  change a tool's behaviour or a setting's meaning, and a patch release will not.
+  Every change, breaking or not, is recorded in [`CHANGELOG.md`](https://github.com/CJ-coding-apps/cognitive-fabric/blob/main/CHANGELOG.md).
+- **Platforms.** Python 3.11–3.13 on Linux and macOS, both tested in CI. Windows
+  is neither tested nor claimed.
+- **Storage engine.** [KùzuDB](https://github.com/kuzudb/kuzu) 0.11.3, pinned
+  exactly. Kùzu is archived upstream and 0.11.3 is its final release, so it
+  receives no further fixes, security fixes included. That pin is also why Python
+  3.14+ is excluded ([Installation](https://github.com/CJ-coding-apps/cognitive-fabric#installation)), and why the version must not
+  float: Kùzu's on-disk format is not stable before 1.0, so a different Kùzu
+  version may not open a graph this one wrote.
+- **Security.** Report vulnerabilities privately, not in a public issue — see
+  [`docs/SECURITY.md`](https://github.com/CJ-coding-apps/cognitive-fabric/blob/main/docs/SECURITY.md).
+
 ## Features
 
 - **Graph memory bank** on KuzuDB — components, decisions, rules, context, files,
@@ -36,7 +57,7 @@ tree-sitter, embedding, and LLM work all run in-process.
 
 ## Installation
 
-Requires Python 3.11–3.13. CI runs the suite on all three, on Linux. Python 3.14
+Requires Python 3.11–3.13. CI runs the suite on all three, on Linux and macOS. Python 3.14
 is excluded deliberately: `kuzu` 0.11.3 — the final release, and the version this
 package pins — ships no 3.14 wheels for macOS or Windows, so on those platforms
 pip would try to build Kùzu's C++ from source.
