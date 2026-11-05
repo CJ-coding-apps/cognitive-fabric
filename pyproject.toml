@@ -61,7 +61,17 @@ dependencies = [
     "uvicorn>=0.30",
     # Cognitive Fabric: in-process symbolic (AST) ingestion.
     # tree-sitter-language-pack is the maintained, Python 3.13-compatible pack.
-    "tree-sitter-language-pack>=0.9.0",
+    #
+    # Capped < 1.24: 1.24.0 (2026-11-05) raised its wheel floors to macOS 26
+    # (`macosx_26_0`) and glibc 2.34 (`manylinux_2_34`). Below those, pip finds no
+    # usable wheel and falls back to a from-source Rust build that needs rustc
+    # >= 1.90 -- so an install on macOS 15 failed outright. 1.23.1 installs from a
+    # wheel there. CI cannot catch this class of break: a runner either meets the
+    # new floors or carries a recent rustc and quietly builds from source, so the
+    # install passes in CI while failing for users. Lift the cap only after checking, on the oldest OS
+    # the README claims, that the newer version installs with `--no-build`; and do
+    # not merge a dependabot bump past it on a green CI run alone.
+    "tree-sitter-language-pack>=0.9.0,<1.24",
 ]
 
 [project.urls]

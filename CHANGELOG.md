@@ -12,7 +12,8 @@ commands and the configuration settings; the Python modules behind them are not 
 
 ## [0.1.1] - 2026-11-05
 
-A release-hygiene patch: nothing in the server's code or behaviour changes.
+Fixes installation on macOS before 26 and on Linux with glibc older than 2.34, and brings the package's
+metadata and documentation up to release standard. Nothing in the server's code or behaviour changes.
 
 ### Added
 
@@ -31,6 +32,12 @@ A release-hygiene patch: nothing in the server's code or behaviour changes.
 
 ### Fixed
 
+- **Installing failed on macOS 15 and earlier.** `tree-sitter-language-pack` was declared with a lower
+  bound only, so a fresh install took 1.24.0, released the same day, whose wheels require macOS 26
+  (`macosx_26_0`) or glibc 2.34 (`manylinux_2_34`). Below those floors there is no usable wheel; the
+  installer falls back to building from Rust source, which needs rustc 1.90, and fails without it. This
+  broke `pip install cognitive-fabric` for 0.1.0 as well. The dependency is now capped below 1.24; 1.23.1
+  installs from a wheel on macOS 15.
 - CI's Docker handshake check compared the server's advertised version against the literal `"0.1.0"`, so
   the first version bump would have failed it on the release pull request itself. It now reads the
   expected version from `pyproject.toml`, the source the package and the handshake already derive from.
