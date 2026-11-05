@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cognitive-fabric"
-version = "0.1.0"
+version = "0.1.1"
 description = "Cognitive Fabric: unified Python MCP server for a KuzuDB graph memory bank with symbolic ingestion, semantic search, and distillation"
 readme = "README.md"
 # The ceiling is Kùzu's, not ours. `kuzu==0.11.3` (pinned below) publishes cp314
