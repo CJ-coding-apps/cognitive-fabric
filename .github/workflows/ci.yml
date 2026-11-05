@@ -65,8 +65,11 @@ jobs:
       # missing. The command will be `mypy src`.
 
   test:
-    name: Test (py${{ matrix.python-version }}, ${{ matrix.profile.name }})
-    runs-on: ubuntu-latest
+    # Linux legs keep their original names ("Test (py3.11, minimal)" and so on),
+    # so branch protection that requires them by name is unaffected; only the
+    # macOS legs carry the suffix.
+    name: Test (py${{ matrix.python-version }}, ${{ matrix.profile.name }}${{ matrix.os != 'ubuntu-latest' && ', macOS' || '' }})
+    runs-on: ${{ matrix.os }}
     needs: lint
     strategy:
       # Report every combination, rather than cancelling the others when one
@@ -77,6 +80,12 @@ jobs:
         # excluded by `requires-python`, because kuzu 0.11.3 ships no cp314 wheels
         # for macOS or Windows; the comment there has the detail.
         python-version: ['3.11', '3.12', '3.13']
+        # Linux and macOS: the two platforms the README and the PyPI classifiers
+        # claim. Every native dependency (kuzu, lancedb, tree-sitter's grammars)
+        # ships separate macOS wheels, so a green Linux run says nothing about
+        # them; this is where "supports macOS" stops being an assumption.
+        # Windows is not claimed and not tested.
+        os: [ubuntu-latest, macos-latest]
         # Two installs, because the failure worth catching here is not a red
         # test -- it is a green run in which the optional half never ran. The
         # vector-store suite is `pytest.importorskip("lancedb")` at module level,
@@ -225,13 +234,21 @@ jobs:
       - name: Assert the handshake
         run: |
           python3 - <<'PY'
-          import json, pathlib, sys
+          import json, pathlib, sys, tomllib
 
-          # Both pinned deliberately: the version this repo publishes, and the
+          # Both checked deliberately: the version this repo publishes, and the
           # name a client sees. Without an explicit `version=` the MCP SDK falls
           # back to the *mcp package's* version, which is how the handshake once
           # advertised 1.30.0 for a 0.1.0 server.
-          EXPECTED_VERSION = "0.1.0"
+          #
+          # The expected version is read from pyproject.toml -- the single source
+          # the package, `--version` and the handshake already derive from --
+          # rather than written here as a literal. A literal goes stale at the
+          # first version bump and fails this job on the release PR itself
+          # (docugraph's identical check did exactly that at its 0.2.0 release).
+          EXPECTED_VERSION = tomllib.loads(
+              pathlib.Path("pyproject.toml").read_text()
+          )["project"]["version"]
           EXPECTED_NAME = "cognitive-fabric"
 
           raw = pathlib.Path("/tmp/handshake.jsonl").read_text()
