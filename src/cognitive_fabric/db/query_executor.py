@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Optional
 import structlog
 
 if TYPE_CHECKING:
-    import kuzu
+    import ladybug as kuzu
 
 logger = structlog.get_logger("QueryExecutor")
 
