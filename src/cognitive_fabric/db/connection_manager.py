@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Optional
 import structlog
 
 if TYPE_CHECKING:
-    import kuzu
+    import ladybug as kuzu
 
 logger = structlog.get_logger("ConnectionManager")
 
@@ -42,7 +42,7 @@ class ConnectionManager:
         Returns:
             The database connection.
         """
-        import kuzu
+        import ladybug as kuzu
 
         if self._connection is not None:
             return self._connection
