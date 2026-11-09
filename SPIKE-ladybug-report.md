@@ -10,15 +10,15 @@
 - A4's macOS "switch Wi-Fi off" was replaced by a per-process network denial (`sandbox-exec`), approved by CJ, with a control connection that must fail. The Mac stayed online.
 - The order says `uv python install 3.14` after updating uv. The system `uv` is 0.7.19 and its 3.14 index stops at a beta; a scratch `uv` 0.13.7 (`/tmp/lb/uv/bin/uv`) was used to install CPython **3.14.10 final**. The system `uv` was not replaced.
 
-No test was edited or weakened. The branch changes 4 files, 6 insertions and 6 deletions (plus this report).
+No test was edited or weakened. The package changes are 4 files, 6 insertions and 6 deletions. The branch also carries this report and one evidence-only pytest plugin, `spike/autoload_algo.py` (§9.1), which is not part of the package.
 
 ---
 
 ## 1. Verdict
 
-**cognitive-fabric: GO-WITH-CONDITIONS.** With only an import rename in three `db/` modules and the dependency swap, the suite is identical to the Kùzu baseline once the ALGO extension is installed and loaded — 188 passed / 1 skipped (minimal) and 191 / 1 (full), the same as `8789d19`; a real 0.11.3 database migrates with identical table counts and query results; and Ladybug supplies cp314 macOS wheels, so 3.14 works for the minimal profile. The conditions are not cosmetic: ALGO is **not bundled**; it is downloaded from `https://extension.ladybugdb.com/` on first `INSTALL`, cached under `~/.lbdb/extension/0.22.0/<platform>/`, and `LOAD EXTENSION ALGO` is required **per Connection** (a projected graph is per-Connection too). Without that install, 12 tests fail and every graph algorithm is unavailable; the repository docstring that says ALGO is "statically linked into the wheel" is false. On Linux the downloaded extension cannot load in a stock `python:3.11-slim` until `libnetworkit`, `libarrow` and `libgomp` are satisfied, and the current PyPI `networkit` (11.3) fails with an ABI symbol mismatch. A local-first port therefore has to solve extension provisioning before it can claim parity.
+**cognitive-fabric: HOLD on Kùzu 0.11.3 for now** (spike verdict: GO-WITH-CONDITIONS; review ruling, 2026-11-08: hold). With only an import rename in three `db/` modules and the dependency swap, the suite is identical to the Kùzu baseline once the ALGO extension is installed and loaded — 188 passed / 1 skipped (minimal) and 191 / 1 (full), the same as `8789d19`; a real 0.11.3 database migrates with identical table counts and query results; and Ladybug supplies cp314 macOS wheels, so 3.14 works for the minimal profile. The conditions are not cosmetic: ALGO is **not bundled**; it is downloaded from `https://extension.ladybugdb.com/`, cached under `~/.lbdb/extension/0.22.0/<platform>/`, and `LOAD EXTENSION ALGO` is required **per Connection** (a projected graph is per-Connection too). Without that install, 12 tests fail and every graph algorithm is unavailable; the repository docstring that says ALGO is "statically linked into the wheel" is false. On Linux the downloaded extension cannot load in a stock `python:3.11-slim`: its ELF `NEEDED` entries include `libnetworkit.so`, `libarrow.so.2600` and `libgomp.so.1`, its `RUNPATH` points at the CI build directory, and neither the installer nor PyPI `networkit` supplies a matching `libnetworkit.so` (§9.3). That kills Louvain, k-core and PageRank on Linux/CI. The same-database goal is reachable in two stages; the Linux algorithm gap is why the review holds.
 
-**graphiti / docugraph: GO-WITH-CONDITIONS, and the condition is a fork.** Of the 48 Kùzu-parameter tests, 25 passed on Kùzu 0.11.3 and 14 pass on Ladybug; 11 regress and none improve. Every regression has one cause: graphiti filters `None` arguments out of its parameter dict, and Ladybug raises `Parameter <name> not found.` where Kùzu binds NULL. Passing the key explicitly as `None` works on Ladybug (verified on a reduced query), so the fix is small — but it is a change to graphiti, whose Kùzu driver is deprecated upstream and will not receive one. If docugraph is willing to vendor or fork `graphiti-core` and re-run the full suite against that patch, the migration is viable; if it insists on upstream graphiti, the honest answer is NO-GO.
+**graphiti / docugraph: GO — no fork needed.** Of the 48 Kùzu-parameter tests, 25 passed on Kùzu 0.11.3 and 14 pass on Ladybug; 11 regress and none improve. Every regression has one cause: graphiti filters `None` arguments out of its parameter dict, and Ladybug raises `Parameter <name> not found.` where Kùzu binds NULL. Passing the key explicitly as `None` works on Ladybug (verified on a reduced query). The fix belongs in a **caller-supplied driver**, not in graphiti: `Graphiti.__init__` accepts `graph_driver: GraphDriver | None` (`graphiti_core/graphiti.py:147`, assigned at 207–208), so docugraph can pass a `LadybugDriver` that keeps optional keys as explicit `None`. graphiti itself needs no patch, fork or vendor. (The first draft said the condition was a fork; the review corrected that, and the report is corrected here.)
 
 ---
 
@@ -97,15 +97,15 @@ control blocked: gaierror: [Errno 8] nodename nor servname provided, or not know
 ```
 control blocked: gaierror: [Errno -3] Temporary failure in name resolution
 ```
-DDL, `project_graph` and shortest path work. `LOAD EXTENSION ALGO` from the cached `linux_amd64` extension fails:
+DDL, `project_graph` and shortest path work. `LOAD EXTENSION ALGO` from the cached `linux_amd64` extension fails in a stock `python:3.11-slim`:
 ```
 libnetworkit.so: cannot open shared object file: No such file or directory
 ```
-`ldd` on the extension shows missing `libnetworkit.so`, `libarrow.so.2600`, `libgomp.so.1`. Installing `pyarrow==26.0.1`, `networkit==11.3`, `libgomp1` and setting `LD_LIBRARY_PATH` to the site-packages root gets further but dies on an ABI mismatch:
+`ldd` on the Linux extension shows missing `libnetworkit.so`, `libarrow.so.2600`, `libgomp.so.1`; its `RUNPATH` is the CI build path `/__w/ladybug/ladybug/extension/algo/vendor/lib`, which cannot exist on a user machine. Installing `libgomp1` satisfies OpenMP. PyPI `networkit==11.3` does **not** ship a `libnetworkit.so` (measured 2026-11-08: the wheel statically links NetworKit into per-module `.so` files), so `LD_LIBRARY_PATH` cannot satisfy the `NEEDED` entry; a probe with a NetworKit 11.3 library on the loader path then fails on an ABI mismatch:
 ```
 undefined symbol: _ZTVN9NetworKit3BFSE
 ```
-`networkit` 11.3 is the latest on PyPI, so pip cannot supply a matching library. This is a **Linux blocker for the algorithm features**, not for DDL or plain Cypher.
+The Linux artifact additionally needs the exact `libarrow.so.2600` SONAME (Arrow 26). This is a **Linux blocker for the algorithm features**, not for DDL or plain Cypher; §9.3 has the full linkage comparison and the draft upstream issue.
 
 ### Q4 — Can a Kùzu 0.11.3 database be moved to Ladybug?
 
@@ -135,11 +135,11 @@ After import, counts and query results were **identical** (A6): 1017 `Symbol`, 1
 
 graphiti's `KuzuDriver.execute_query` filters `None` values out (`{k: v for k, v in kwargs.items() if v is not None}`), so `expired_at`/`reference_time` are absent from a non-empty dict on edge writes. Kuzu tolerated that; Ladybug does not.
 
-- **Candidate fix, verified but not applied:** pass the optional keys explicitly as `None`. On Ladybug:
+- **Fix location (corrected by review): a caller-supplied driver, not graphiti.** `Graphiti.__init__` takes `graph_driver: GraphDriver | None` (`graphiti_core/graphiti.py:147`) and uses it at 207–208, so docugraph can construct `Graphiti(..., graph_driver=LadybugDriver(...))`; that driver imports `ladybug`, reuses the Kùzu driver's statements and keeps optional keys as explicit `None` rather than filtering them. No graphiti fork, patch or vendored git dependency is required. Verified on Ladybug:
   ```
   parameters={'value':'v','expired_at':None} → [[1, None]]
   ```
-  Applying that to graphiti is a change to graphiti, which is outside this spike and, per the non-goals, was not done. It must be re-run against all 48 Kùzu tests before it can be called a fix.
+  The driver's effect on all 48 Kùzu tests is still unmeasured; that remains the condition on the docugraph side.
 - **What works under Ladybug:** all the other Kùzu-parameter paths that pass in B1 — node/episode/community CRUD and edges, basic search, and the driver's DDL. graphiti does not use ALGO, so it needs no extension install.
 - **Skips are the driver's own:** 4 full-text tests (`Skipping as fulltext indexing not supported for Kuzu`) and `get_relevant_nodes` (`Skipping as tests fail on Kuzu`) skip identically in both runs. They are not regressions; they are pre-existing gaps (see B3).
 
@@ -265,6 +265,8 @@ pytest tests/unit/ tests/integration/ tests/e2e/ -v --tb=short -rs
 | Port, no ALGO | **12 failed, 176 passed, 1 skipped** (82.98 s) | **12 failed, 179 passed, 1 skipped** (94.18 s) |
 | Port + ALGO installed and loaded per connection | **188 passed, 1 skipped** (86.97 s) | **191 passed, 1 skipped** (128.02 s) |
 
+The ALGO rows were produced by the scratch pytest plugin described in §9.1 (now committed as `spike/autoload_algo.py`), which runs `LOAD EXTENSION ALGO` on every `ladybug.Connection`. They are not reproducible from the four import-line changes alone.
+
 Skips are the same in every run: minimal skips `test_vector_store.py` (no lancedb); full skips `test_fabric_services.py:177` (`[semantic]` installed, full profile).
 
 The 12 failures without ALGO are all the same error (`weakly_connected_components is not defined … ALGO extension`):
@@ -369,12 +371,12 @@ Total code: **well under 150 lines**. The cost is the offline-provisioning decis
 
 | File | Change | Rough size |
 |---|---|---|
-| `graphiti_core/driver/kuzu_driver.py` | `import ladybug as kuzu` | 1 line |
-| `graphiti_core/driver/kuzu_driver.py` (or call sites) | keep optional keys in the parameter dict as explicit `None` instead of filtering them | ~1–5 lines, plus re-run |
-| `docugraph/pyproject.toml` `[graph]` | depend on the patched graphiti (git source or vendored) and `ladybug` instead of `kuzu` | 1–3 lines |
-| docugraph source | none — it only names `KuzuDriver`; no direct `kuzu` import | 0 |
+| new `docugraph` driver module (e.g. `src/docugraph/storage/ladybug_driver.py`) | a `GraphDriver` supplied by docugraph: imports `ladybug`, reuses the Kùzu driver's operation modules, and keeps optional keys as explicit `None` instead of filtering them | ~30–60 lines |
+| `src/docugraph/storage/graph_store.py` | construct `Graphiti(..., graph_driver=LadybugDriver(...))` | 1–3 lines |
+| `docugraph/pyproject.toml` `[graph]` | `graphiti-core` (without `[kuzu]`) plus `ladybug==0.22.3`; drop the `kuzu==0.11.3` pin | 1–2 lines |
+| graphiti | **none** — no patch, fork or vendored source; `Graphiti(graph_driver=...)` is public API (`graphiti_core/graphiti.py:147`) | 0 |
 
-Code size is trivial; the governance cost is not. Upstream graphiti deprecated its Kùzu driver (graphiti #1548), so the patch has no upstream home. A real move means owning a fork or vendor, with the 21 pre-existing baseline failures still to triage.
+Code size is trivial. Upstream graphiti deprecated its Kùzu driver (graphiti #1548), which is why the driver must live above graphiti rather than await an upstream fix — but that costs docugraph a driver module, not a fork. The 21 pre-existing baseline failures still need triage before a full-suite claim.
 
 ---
 
@@ -394,4 +396,192 @@ Code size is trivial; the governance cost is not. Upstream graphiti deprecated i
 12. **No performance benchmarking** was done (non-goal). Suite wall times: full profile 88.06 s baseline vs 128.02 s port+ALGO (1.45×, not >5×); minimal 92.23 s vs 86.97 s.
 13. **`uv`:** the system binary remains 0.7.19; a scratch `uv` 0.13.7 installed CPython 3.14.10 into `~/.local/share/uv/python/`. That interpreter remains on disk after cleanup.
 14. **The extension URL** (`https://extension.ladybugdb.com/`) is a string read from the binary; the exact per-extension request path was not captured.
-15. **No docugraph code was changed or run.** Q5's impact on docugraph's add/search paths is inferred from graphiti's call graph and the 11 failing mock tests, not from a docugraph end-to-end run.
+15. **No docugraph code was changed or run.** Q5's impact on docugraph's add/search paths is inferred from graphiti's call graph and the 11 failing mock tests, not from a docugraph end-to-end run. The review's correction — that the fix belongs in a docugraph-supplied `GraphDriver` passed to `Graphiti(graph_driver=...)`, so no graphiti fork is needed — is recorded in §1, Q5 and §7; the driver itself was not written or measured.
+
+---
+
+## 9. Follow-up addendum (F1–F3, 2026-11-08)
+
+### 9.1 F1 — how the "Port + ALGO" runs actually loaded ALGO
+
+The four-line import change does **not** install or load ALGO. The 188/191 rows in §6.1 were produced by an **uncommitted scratch pytest plugin**, injected at run time:
+
+```bash
+HOME=/tmp/lb/fakehome PYTHONPATH=/tmp/lb/plugins \
+  /tmp/lb/venvs/port-min/bin/python -m pytest tests/unit/ tests/integration/ tests/e2e/ \
+    -v --tb=short -rs -p autoload_algo
+```
+
+The plugin monkeypatched `ladybug.Connection.__init__` and ran `LOAD EXTENSION ALGO` after the original constructor; a failure was printed to stderr, not swallowed. So the answer is: neither auto-load, nor `conftest.py`, nor an environment variable — **uncommitted code**, now committed for reproducibility as `spike/autoload_algo.py` (evidence harness only; it is deliberately not package code). The re-run used:
+
+```bash
+HOME=$HOME PYTHONPATH=spike /tmp/lb2/min/bin/python -m pytest \
+  tests/unit/ tests/integration/ tests/e2e/ -v --tb=short -rs -p autoload_algo
+```
+
+Measured on the spike branch, CPython 3.11.13, pytest 9.2.0, `ladybug==0.22.3`, with ALGO installed once into `~/.lbdb` beforehand:
+
+| Profile | Result | Wall | `LOAD EXTENSION ALGO failed` lines |
+|---|---|---|---|
+| minimal `.[dev]` | **188 passed, 1 skipped** | 118.52 s | 0 |
+| full `.[dev,cloud,semantic]` | **191 passed, 1 skipped** | 217.21 s | 0 |
+
+A real port must not ship this monkeypatch: the `LOAD` belongs in `connection_manager.Connect`, after the connection is created and before any query, with a decision about provisioning (first-run download, bundled extension, or a hard failure with instructions).
+
+### 9.2 F2 — is the `INSTALL ALGO` download checksummed or signed?
+
+**No.** At `v0.22.3`, `src/extension/extension_installer.cpp`:
+
+- `tryDownloadExtensionFile` (lines 49–98) issues `httplib::Client(repoInfo.hostURL.c_str())` and `cli.Get(repoInfo.hostPath.c_str(), headers)` (53), writes `res->body` to a temp file (81), `syncFile()`s it (83), and atomically `renameFile`s it into place (92). No hash, signature, manifest or length check exists on `res->body` before or after the rename. The only integrity property is transport TLS (`configureSSLCerts`, line 28) and proxy configuration (line 17).
+- `installExtension` (108–139) returns early if the file already exists and otherwise calls `tryDownloadExtensionFile`.
+- `installDependencies` (141–156) is the sharper edge: if the extension repository serves a dependency installer, it downloads that binary (152), loads it as a shared library (`ExtensionLibLoader`, 153), resolves its install function (154) and executes it in-process: `(*install)(info.repo, context)` (155). The trust boundary is the extension server and TLS; there is no pinned digest. (ALGO itself did not appear to ship an installer — the 404 path returns silently — but the payload it does serve is still unverified.)
+- The docs do not add a verification step: `docs/extensions.md` documents `INSTALL`/`LOAD`/`UPDATE`, proxies, building and testing, with no integrity section; `https://docs.ladybugdb.com/extensions/` was fetched on 2026-11-08 and likewise documents only install/load/update/proxy (it was last updated 2026-10-16).
+
+Consequence: a port that runs `INSTALL ALGO` at first use downloads and `dlopen`s native code whose provenance rests on HTTPS and the server, not on a signature or a pinned checksum. A local-first deployment that cannot accept that should pre-provision the extension out-of-band — which also solves F1's loading point and F3's Linux libraries.
+
+### 9.3 F3 — why macOS loads and Linux does not; docs gap; draft upstream issue
+
+Measured on the same `ladybug==0.22.3` install (macOS 15 x86_64; Linux `python:3.11-slim`, x86_64):
+
+| | macOS x86_64 | Linux x86_64 |
+|---|---|---|
+| File | Mach-O 64-bit dynamically linked shared library | ELF 64-bit LSB shared object |
+| Size | 486,896 B | 1,275,048 B |
+| Linkage view | `otool -L`: `@rpath/libalgo.lbug_extension`, `/usr/lib/libc++.1.dylib`, `/usr/lib/libSystem.B.dylib` | `readelf -d`: `NEEDED` `libnetworkit.so`, `libarrow.so.2600`, `libdl.so.2`, `librt.so.1`, `libgomp.so.1`, `libpthread.so.0`, `libstdc++.so.6`, `libm.so.6`, `libgcc_s.so.1`, `libc.so.6` |
+| NetworKit symbols | none (0 `NetworKit` symbols; 162 undefined symbols total) | 56 undefined `NetworKit::*` symbols |
+| GDS_* functions | absent | present in the binary (`GDS_PAGE_RANK`, `GDS_LOUVAIN`, `GDS_LEIDEN`, …) |
+| Load result | **ok** | `RuntimeError: IO exception: Failed to load library: … Error: libnetworkit.so: cannot open shared object file: No such file or directory.` |
+
+**Why the macOS binary has no NetworKit dependency — it is not static linking.** The macOS x86_64 artifact was built with `ICEBUG_ENABLED=OFF`:
+
+- The build requests `https://github.com/Ladybug-Memory/icebug/releases/download/13.5/icebug-macos-x86_64.tar.gz` (`extension/algo/cmake/download_icebug.cmake`). The icebug 13.5 release publishes `icebug-linux-x86_64`, `icebug-linux-arm64`, `icebug-macos-arm64` and `icebug-win-amd64`, but **no `icebug-macos-x86_64` asset**; the URL returns 404 (checked 2026-11-08).
+- On download failure, `download_icebug.cmake` prints a WARNING, sets `ICEBUG_ENABLED` to `OFF` in the cache, and returns; the build then compiles the hand-rolled algorithms without `gds_registry.cpp` / `gds_csr_bridge.cpp` and without Arrow/OpenMP/NetworKit linkage (`extension/algo/CMakeLists.txt`, `algo/src/function/CMakeLists.txt`).
+- Measured consequence: after `LOAD EXTENSION ALGO` on this Mac, `SHOW_FUNCTIONS()` lists only `KCORE`, `K_CORE_DECOMPOSITION`, `LOUVAIN`, `PAGE_RANK`, `SPANNING_FOREST`, `STRONGLY_CONNECTED_COMPONENTS`, `STRONGLY_CONNECTED_COMPONENTS_KOSARAJU`, `WEAKLY_CONNECTED_COMPONENTS`. There is no `GDS_PAGE_RANK`/`GDS_LOUVAIN`/`GDS_LEIDEN`.
+
+So macOS "works" because the NetworKit-backed functions were silently dropped from that artifact, not because the dependencies were bundled. The spike's algorithm probes and the 188/191 runs use the hand-rolled functions (`page_rank`, `louvain`, `k_core_decomposition`, `weakly_connected_components`; catalog names uppercase), which is why they pass.
+
+**Why the Linux binary needs the libraries.** The Linux build uses the vendored `icebug` prebuilt (a NetworKit fork) and system Arrow 26 (the build workflow pins `libarrow.so.2600` because "the icebug 13.5 prebuilt vendored by extension/algo needs the 2600 SONAME"), links `Arrow::arrow_shared` and `OpenMP::OpenMP_CXX`, and sets `BUILD_RPATH`/`INSTALL_RPATH` to `${ICEBUG_RPATH_DIR}` = `<build>/extension/algo/vendor/lib` (`extension/algo/CMakeLists.txt`). That build path is baked into the released ELF as:
+
+```
+RUNPATH  /__w/ladybug/ladybug/extension/algo/vendor/lib
+```
+
+which cannot exist on a user machine. Even a system `libnetworkit.so` would need `ldconfig` or `LD_LIBRARY_PATH`; `libarrow.so.2600` pins Arrow 26; `libgomp.so.1` is `libgomp1`.
+
+**Minimal reproduction (stock image, network on for `INSTALL`):**
+
+```bash
+docker run --rm -i python:3.11-slim sh -s <<'SH'
+pip install --quiet ladybug==0.22.3
+python - <<'PY'
+import ladybug, tempfile
+d = ladybug.Database(tempfile.mkdtemp() + "/db")
+c = ladybug.Connection(d)
+c.execute("INSTALL ALGO")
+print("installed")
+c.execute("LOAD EXTENSION ALGO")
+print("loaded")
+PY
+SH
+```
+
+Measured output:
+
+```
+installed
+Traceback (most recent call last):
+  ...
+RuntimeError: IO exception: Failed to load library: /root/.lbdb/extension/0.22.0/linux_amd64/algo/libalgo.lbug_extension which is needed by extension: algo.
+Error: libnetworkit.so: cannot open shared object file: No such file or directory.
+```
+
+`pip install networkit` does not fix it: the PyPI 11.3 wheel ships no `libnetworkit.so` at all (its NetworKit code is statically linked into per-module `networkit/*.so` files), so `LD_LIBRARY_PATH` has nothing to point at. A NetworKit 11.3 library placed on the loader path gets to the next failure, an ABI mismatch (`undefined symbol: _ZTVN9NetworKit3BFSE`). The vendored icebug 13.5 is the only known-compatible build.
+
+**Docs gap.** Neither `docs/extensions.md` in the repository nor `https://docs.ladybugdb.com/extensions/` mentions Linux shared-library requirements, `libnetworkit`, `libarrow`, `libgomp`, `apt-get`, or platform support. The requirement appears only in build-side comments: `.github/workflows/build-extensions.yml` (Arrow 26/`libarrow.so.2600`, manylinux_2_28 container) and `extension/algo/{CMakeLists.txt,cmake/download_icebug.cmake}`. The `INSTALL` path never checks or reports it.
+
+**Existing upstream reports.** This is not unknown upstream, but the Linux x86_64 case is not covered as such:
+
+- **#1190 (open)** — macOS arm64: `libnetworkit.dylib`, `libarrow.2500.dylib`, `libomp.dylib` not shipped; `LC_RPATH` points at the CI runner. Same class.
+- **#857 (open)** — Linux: after installing icebug + libarrow, `undefined symbol: _ZTVN9NetworKit6GraphRE` (ABI mismatch).
+
+**Draft issue — for CJ to file (NOT filed; no comment posted):**
+
+~~~~markdown
+### Ladybug version
+
+0.22.3 (PyPI `ladybug==0.22.3`, manylinux x86_64 wheel). The extension is served under `0.22.0/linux_amd64/`.
+
+### What operating system are you using?
+
+Linux x86_64, stock `python:3.11-slim` (Debian bookworm, glibc 2.36). The same extension also fails on a normal desktop Linux install; nothing here is Docker-specific.
+
+### What happened?
+
+`INSTALL algo` succeeds, then `LOAD algo` fails in the same process:
+
+```python
+import ladybug, tempfile
+d = ladybug.Database(tempfile.mkdtemp() + "/db")
+c = ladybug.Connection(d)
+c.execute("INSTALL ALGO")
+c.execute("LOAD EXTENSION ALGO")
+```
+
+```
+RuntimeError: IO exception: Failed to load library: /root/.lbdb/extension/0.22.0/linux_amd64/algo/libalgo.lbug_extension which is needed by extension: algo.
+Error: libnetworkit.so: cannot open shared object file: No such file or directory.
+```
+
+Minimal reproduction:
+
+```bash
+docker run --rm -i python:3.11-slim sh -s <<'SH'
+pip install --quiet ladybug==0.22.3
+python - <<'PY'
+import ladybug, tempfile
+d = ladybug.Database(tempfile.mkdtemp() + "/db")
+c = ladybug.Connection(d)
+c.execute("INSTALL ALGO")
+print("installed")
+c.execute("LOAD EXTENSION ALGO")
+print("loaded")
+PY
+SH
+```
+
+The extension binary's requirements:
+
+```
+$ readelf -d ~/.lbdb/extension/0.22.0/linux_amd64/algo/libalgo.lbug_extension | grep -E "NEEDED|RUNPATH"
+ (NEEDED)  Shared library: [libnetworkit.so]
+ (NEEDED)  Shared library: [libarrow.so.2600]
+ (NEEDED)  Shared library: [libgomp.so.1]
+ (RUNPATH) Library runpath: [/__w/ladybug/ladybug/extension/algo/vendor/lib]
+```
+
+`ldd` reports `libnetworkit.so`, `libarrow.so.2600` and `libgomp.so.1` as `not found`. The `RUNPATH` is the GitHub Actions build directory and cannot exist on a user machine.
+
+### Expected
+
+`INSTALL algo` should produce an extension that `LOAD`s on a machine without the build environment — by bundling the libraries next to the extension with an `$ORIGIN` rpath (the `@loader_path` equivalent), linking them statically, or documenting and provisioning the exact system packages.
+
+### Additional finding: the macOS x86_64 artifact silently loses the GDS_* functions
+
+On macOS 15 x86_64, the 0.22.3 `algo` artifact loads because it was built with `ICEBUG_ENABLED=OFF`: the build requests `icebug-macos-x86_64.tar.gz`, but the icebug 13.5 release ships only `icebug-macos-arm64` for macOS (the x86_64 URL returns 404), and `algo/cmake/download_icebug.cmake` disables `ICEBUG_ENABLED` with only a build-time WARNING when the download fails. The resulting extension links only `libc++`/`libSystem`, has no `GDS_PAGE_RANK` strings, and `SHOW_FUNCTIONS()` after `LOAD EXTENSION ALGO` lists only KCORE, K_CORE_DECOMPOSITION, LOUVAIN, PAGE_RANK, SPANNING_FOREST, STRONGLY_CONNECTED_COMPONENTS, STRONGLY_CONNECTED_COMPONENTS_KOSARAJU and WEAKLY_CONNECTED_COMPONENTS. So macOS x86_64 has the opposite problem: it loads, but the NetworKit-backed GDS_* algorithms are missing, with no runtime signal.
+
+### Notes
+
+- `INSTALL algo` downloads only `libalgo.lbug_extension`; no shared libraries are installed.
+- PyPI `networkit==11.3` does not ship `libnetworkit.so` (NetworKit is statically linked into per-module extension modules), so `pip install networkit` cannot satisfy the `NEEDED` entry. A separately built NetworKit 11.3 then fails on ABI (`undefined symbol: _ZTVN9NetworKit3BFSE`).
+- Neither `docs/extensions.md` nor https://docs.ladybugdb.com/extensions/ documents the Linux requirement; it appears only in the build workflow and CMake comments.
+- Related: #1190 (macOS arm64 missing libnetworkit/libarrow/libomp; rpath at the runner), #857 (Linux undefined NetworKit symbols after installing icebug + libarrow).
+
+### Suggested fixes
+
+1. Bundle the dependencies with the extension and use `$ORIGIN` / `@loader_path` (what #1190 asks for).
+2. If bundling is not possible, document the exact packages (`libgomp1`, Arrow 26 providing `libarrow.so.2600`, the icebug 13.5 `libnetworkit.so`) and make `INSTALL algo` install them or fail with that instruction.
+3. Replace the build-time `RUNPATH` with a relocatable one; the current value cannot exist on user machines.
+4. Make `LOAD` report the missing library and the install step, not only the raw `dlopen` error.
+~~~~
+
+No issue was filed and no upstream comment was posted; the draft above is for CJ to file or fold into #1190.
